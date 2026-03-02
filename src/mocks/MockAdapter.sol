@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: CC0-1.0
 pragma solidity ^0.8.24;
 
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+
 /// @title MockAdapter
 /// @notice A simple adapter for testing MandatedVaultClone execution.
 contract MockAdapter {
@@ -111,5 +113,36 @@ contract ShortReturnAuthority {
             mstore(0, 0x1626ba7e00000000000000000000000000000000000000000000000000000000)
             return(0, 4)
         }
+    }
+}
+
+/// @title GasBurningAdapter
+/// @notice Adapter that intentionally burns gas then reverts, for gas-griefing stress tests.
+contract GasBurningAdapter {
+    function burnGasAndRevert(uint256 loops) external pure {
+        uint256 acc;
+        for (uint256 i = 0; i < loops;) {
+            acc += i;
+            unchecked {
+                ++i;
+            }
+        }
+        if (acc >= 0) revert("burned");
+    }
+}
+
+/// @title VaultBusyAttackAdapter
+/// @notice Attempts ERC-4626 operations on the vault during execute() to test VaultBusy reentrancy guard.
+contract VaultBusyAttackAdapter {
+    function tryMint(address vault, uint256 shares) external {
+        IERC4626(vault).mint(shares, address(this));
+    }
+
+    function tryWithdraw(address vault, uint256 assets) external {
+        IERC4626(vault).withdraw(assets, address(this), address(this));
+    }
+
+    function tryRedeem(address vault, uint256 shares) external {
+        IERC4626(vault).redeem(shares, address(this), address(this));
     }
 }

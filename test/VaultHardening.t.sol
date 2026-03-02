@@ -8,39 +8,14 @@ import {VaultFactory} from "../src/VaultFactory.sol";
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
 import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
 import {MockAdapter} from "../src/mocks/MockAdapter.sol";
+import {GasBurningAdapter} from "../src/mocks/MockAdapter.sol";
+import {VaultBusyAttackAdapter} from "../src/mocks/MockAdapter.sol";
 
 contract HardeningToken is ERC20 {
     constructor() ERC20("Hardening Token", "HARD") {}
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
-    }
-}
-
-contract GasBurningAdapter {
-    function burnGasAndRevert(uint256 loops) external pure {
-        uint256 acc;
-        for (uint256 i = 0; i < loops;) {
-            acc += i;
-            unchecked {
-                ++i;
-            }
-        }
-        if (acc >= 0) revert("burned");
-    }
-}
-
-contract VaultBusyAttackAdapter {
-    function tryMint(address vault, uint256 shares) external {
-        MandatedVaultClone(payable(vault)).mint(shares, address(this));
-    }
-
-    function tryWithdraw(address vault, uint256 assets) external {
-        MandatedVaultClone(payable(vault)).withdraw(assets, address(this), address(this));
-    }
-
-    function tryRedeem(address vault, uint256 shares) external {
-        MandatedVaultClone(payable(vault)).redeem(shares, address(this), address(this));
     }
 }
 
