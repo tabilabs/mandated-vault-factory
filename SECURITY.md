@@ -40,6 +40,18 @@ The following are documented design trade-offs, not vulnerabilities:
 - `execute()` does not forward ETH (`action.value` must be 0)
 - Return data from failed actions is truncated to 4 KiB
 
+## Adapter Governance Requirements
+
+When computing/signing `allowedAdaptersRoot`, maintainers must complete these checks:
+
+1. Verify whether each adapter is upgradeable (proxy) or immutable.
+2. For upgradeable adapters, record current implementation address and upgrade admin.
+3. If implementation/governance state changes, revoke affected mandates and re-sign a new root.
+4. Keep emergency response runbooks for authority key rotation and nonce invalidation.
+5. Prefer immutable adapters for long-lived mandates.
+
+These controls are mandatory because Merkle binding uses `(adapter, codehash)` and cannot independently pin proxy implementations.
+
 ## Audit Status
 
 This codebase has not yet undergone a formal third-party audit. Use at your own risk.

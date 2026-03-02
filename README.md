@@ -97,3 +97,8 @@ forge build --sizes
 ## License
 
 CC0-1.0
+
+## Additional Policies
+
+- Security reporting and adapter governance: `SECURITY.md`
+- Third-party license boundary: `THIRD_PARTY_LICENSES.md`
