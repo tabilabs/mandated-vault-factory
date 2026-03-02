@@ -26,6 +26,11 @@ jobs:
         run: |
           forge --version
 
+      - name: Run license boundary check
+        run: |
+          chmod +x scripts/check-licenses.sh
+          ./scripts/check-licenses.sh
+
       - name: Run Forge fmt
         run: |
           forge fmt --check
