@@ -1,0 +1,16 @@
+# Compiler files
+cache/
+out/
+
+# Broadcast logs (may contain deployment data)
+broadcast/
+
+# Dotenv file
+.env
+
+# Local dev context
+.context/
+context-map/
+
+# Editor
+.vscode/
