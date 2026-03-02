@@ -104,17 +104,9 @@ contract VaultHardeningTest is Test {
     function test_actionCallFailed_gasBurningAdapter() public {
         MandatedVaultClone v = _createVault();
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(
-            address(gasBurner), 0, abi.encodeCall(GasBurningAdapter.burnGasAndRevert, (60_000))
-        );
-
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, 0, _singleLeafRoot(address(gasBurner)), "");
-        bytes memory sig = _sign(v, m);
-
-        vm.prank(executor);
-        vm.expectPartialRevert(IERCXXXXMandatedVault.ActionCallFailed.selector);
-        v.execute(m, actions, sig, _proofs1(), "");
+        uint256 lightGas = _measureBurningAdapterExecutionGas(v, 0, 1_000);
+        uint256 heavyGas = _measureBurningAdapterExecutionGas(v, 1, 60_000);
+        assertGt(heavyGas, lightGas, "heavy burn should consume more gas than light burn");
     }
 
     function test_vaultBusy_mintDuringExecute() public {
@@ -125,7 +117,7 @@ contract VaultHardeningTest is Test {
             address(busyAttacker), 0, abi.encodeCall(VaultBusyAttackAdapter.tryMint, (address(v), 1e18))
         );
 
-        _expectVaultBusyInner(v, actions, _singleLeafRoot(address(busyAttacker)));
+        _expectVaultBusyInner(v, actions, _singleLeafRoot(address(busyAttacker)), 0);
     }
 
     function test_vaultBusy_withdrawDuringExecute() public {
@@ -136,7 +128,7 @@ contract VaultHardeningTest is Test {
             address(busyAttacker), 0, abi.encodeCall(VaultBusyAttackAdapter.tryWithdraw, (address(v), 1e18))
         );
 
-        _expectVaultBusyInner(v, actions, _singleLeafRoot(address(busyAttacker)));
+        _expectVaultBusyInner(v, actions, _singleLeafRoot(address(busyAttacker)), 0);
     }
 
     function test_vaultBusy_redeemDuringExecute() public {
@@ -147,12 +139,15 @@ contract VaultHardeningTest is Test {
             address(busyAttacker), 0, abi.encodeCall(VaultBusyAttackAdapter.tryRedeem, (address(v), 1e18))
         );
 
-        _expectVaultBusyInner(v, actions, _singleLeafRoot(address(busyAttacker)));
+        _expectVaultBusyInner(v, actions, _singleLeafRoot(address(busyAttacker)), 0);
     }
 
-    function _expectVaultBusyInner(MandatedVaultClone v, IERCXXXXMandatedVault.Action[] memory actions, bytes32 root)
-        internal
-    {
+    function _expectVaultBusyInner(
+        MandatedVaultClone v,
+        IERCXXXXMandatedVault.Action[] memory actions,
+        bytes32 root,
+        uint256 expectedActionIndex
+    ) internal {
         IERCXXXXMandatedVault.Mandate memory m = _mandate(v, 0, root, "");
         bytes memory sig = _sign(v, m);
 
@@ -164,9 +159,32 @@ contract VaultHardeningTest is Test {
             assertEq(bytes4(revertData), IERCXXXXMandatedVault.ActionCallFailed.selector, "wrong outer selector");
 
             (uint256 actionIndex, bytes memory innerReason) = abi.decode(_stripSelector(revertData), (uint256, bytes));
-            assertEq(actionIndex, 0, "wrong action index");
+            assertEq(actionIndex, expectedActionIndex, "wrong action index");
             assertEq(bytes4(innerReason), IERCXXXXMandatedVault.VaultBusy.selector, "inner reason should be VaultBusy");
         }
+    }
+
+    function _measureBurningAdapterExecutionGas(MandatedVaultClone v, uint256 nonce, uint256 loops)
+        internal
+        returns (uint256 gasSpent)
+    {
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action(
+            address(gasBurner), 0, abi.encodeCall(GasBurningAdapter.burnGasAndRevert, (loops))
+        );
+
+        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, _singleLeafRoot(address(gasBurner)), "");
+        bytes memory sig = _sign(v, m);
+
+        vm.prank(executor);
+        uint256 beforeGas = gasleft();
+        try v.execute(m, actions, sig, _proofs1(), "") {
+            revert("expected revert");
+        } catch (bytes memory revertData) {
+            assertGt(revertData.length, 4, "revert data too short");
+            assertEq(bytes4(revertData), IERCXXXXMandatedVault.ActionCallFailed.selector, "wrong selector");
+        }
+        gasSpent = beforeGas - gasleft();
     }
 
     function _stripSelector(bytes memory data) internal pure returns (bytes memory payload) {

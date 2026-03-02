@@ -3,15 +3,25 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+ALLOWED_AGPL_PREFIXES=(
+  "lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/"
+  "lib/openzeppelin-contracts-upgradeable/lib/halmos-cheatcodes/"
+  "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/lib/erc4626-tests/"
+  "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/lib/halmos-cheatcodes/"
+)
+
 violations=()
 
 while IFS= read -r file; do
   if grep -qi "GNU AFFERO GENERAL PUBLIC LICENSE" "$file"; then
     rel="${file#"$ROOT_DIR"/}"
     allowed=false
-    case "$rel" in
-      *"/erc4626-tests/"*|*"/halmos-cheatcodes/"*) allowed=true ;;
-    esac
+    for prefix in "${ALLOWED_AGPL_PREFIXES[@]}"; do
+      if [[ "$rel" == "$prefix"* ]]; then
+        allowed=true
+        break
+      fi
+    done
 
     if [[ "$allowed" == false ]]; then
       violations+=("$rel")
