@@ -1,0 +1,36 @@
+{
+  "chainId": 97,
+  "network": "bsc-testnet",
+  "factory": "<to-be-deployed>",
+  "adapters": {
+    "venus": "<to-be-deployed>",
+    "pancakeswap": "<to-be-deployed>"
+  },
+  "adapterCodehashes": {
+    "venus": "<to-be-filled>",
+    "pancakeswap": "<to-be-filled>"
+  },
+  "adapterLeaves": {
+    "venus": "<to-be-filled>",
+    "pancakeswap": "<to-be-filled>"
+  },
+  "protocols": {
+    "venus": {
+      "comptroller": "0x94d1820b2D1c7c7452A163983Dc888CEC546b77D",
+      "vBUSD": "0x08e0A5575De71037aE36AbfAfb516595fE68e5e4",
+      "vUSDT": "0xb7526572FFE56AB9D7489838Bf2E18e3323b441A"
+    },
+    "pancakeswap": {
+      "router": "0x1b81D678ffb9C0263b24A97847620C99d213eB14",
+      "factory": "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
+      "wnative": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
+    }
+  },
+  "tokens": {
+    "BUSD": "0xeD24FC36d5Ee211Ea25A80239Fb8C4Cfd80f12Ee",
+    "USDT": "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd",
+    "WBNB": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
+  },
+  "deployedAt": "<to-be-filled>",
+  "deployer": "<to-be-filled>"
+}
