@@ -80,7 +80,87 @@ forge coverage --report summary --ir-minimum
 forge build --sizes
 ```
 
-## Test Coverage (69 tests)
+## BSC Testnet Deployment (P0)
+
+The repository includes minimal deployment artifacts for BSC Testnet:
+
+- Foundry scripts:
+  - `script/DeployFactory.s.sol`
+  - `script/DeployAdapters.s.sol`
+- Shell wrapper:
+  - `scripts/deploy-bsc-testnet.sh`
+  - requires local `forge`, `cast`, and `jq`
+- Deployment record template:
+  - `deployments/bsc-testnet.json`
+  - includes adapter `codehash` and Merkle `leaf` values for allowlist construction
+
+Set required environment variables:
+
+```bash
+export BSC_TESTNET_RPC="https://data-seed-prebsc-1-s1.binance.org:8545/"
+# optional: enables auto verify on BscScan testnet
+export BSCSCAN_API_KEY="..."
+```
+
+Signer mode (recommended: keystore account):
+
+```bash
+# auto mode picks account > ledger > private-key
+export DEPLOY_SIGNER_MODE="auto"
+export DEPLOYER_ACCOUNT="bsc-testnet-deployer"
+export DEPLOYER_PASSWORD_FILE="$HOME/.secrets/foundry-keystore.pass"
+```
+
+Private key fallback:
+
+```bash
+export DEPLOY_SIGNER_MODE="private-key"
+export DEPLOYER_PRIVATE_KEY="0x..."
+```
+
+Ledger mode:
+
+```bash
+export DEPLOY_SIGNER_MODE="ledger"
+export DEPLOY_USE_LEDGER=1
+# optional
+export DEPLOYER_DERIVATION_PATH="m/44'/60'/0'/0/0"
+```
+
+Run deployment:
+
+```bash
+bash scripts/deploy-bsc-testnet.sh
+```
+
+Optional overrides:
+
+```bash
+export BSC_TESTNET_CHAIN_ID=97
+export FOUNDRY_OUT_DIR="out"
+export PANCAKESWAP_V3_ROUTER="0x1b81D678ffb9C0263b24A97847620C99d213eB14"
+export PANCAKESWAP_V3_FACTORY="0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
+export PANCAKESWAP_V3_WNATIVE="0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
+```
+
+Adapter notes:
+
+- `PancakeSwapV3Adapter.swap(...)` uses router `exactInputSingle` with a `deadline` field.
+- Use a short deadline window (e.g. `block.timestamp + 60`) to avoid stale execution.
+- `scripts/deploy-bsc-testnet.sh` validates router compatibility via `factory()` and `WETH9()` static calls before broadcasting.
+- `scripts/deploy-bsc-testnet.sh` writes `deployments/bsc-testnet.json` atomically (tmp + `mv`) and validates JSON before replace.
+
+Fork test suites are split by intent:
+
+```bash
+# deterministic (CI-friendly)
+forge test --match-path 'test/VaultForkBsc*.t.sol' --match-test 'test_bscFork_deterministic_'
+
+# smoke (allows protocol-unavailable skip branches)
+forge test --match-path 'test/VaultForkBsc*.t.sol' --match-test 'test_bscFork_smoke_'
+```
+
+## Test Coverage
 
 - **Factory**: creation, registration, events, address prediction, duplicate salt, zero-address checks, multi-creator isolation
 - **Implementation**: locked against re-initialization
