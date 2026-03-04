@@ -16,12 +16,23 @@ import {
     BSC_VUSDT
 } from "./helpers/BscForkConstants.sol";
 import {VaultForkBscBase} from "./VaultForkBsc.Base.t.sol";
+import {BscTestnetDeploymentJson} from "./helpers/BscTestnetDeploymentJson.sol";
 
 contract VaultForkBscVenusTest is VaultForkBscBase {
     function test_bscFork_deterministic_guard_chainIdAndDeployment() public view {
         assertEq(block.chainid, BSC_CHAIN_ID, "chain id mismatch");
         assertGt(address(factory).code.length, 0, "factory not deployed");
         assertGt(address(venusAdapter).code.length, 0, "venus adapter not deployed");
+    }
+
+    function test_bscFork_guard_defaultHead_doesNotForceRollToConstantBlock() public {
+        if (vm.envExists("BSC_FORK_BLOCK")) {
+            vm.skip(true, "set BSC_FORK_BLOCK detected: default-head behavior not applicable");
+            return;
+        }
+
+        assertFalse(rolledToPinnedBlock, "default mode should not roll fork to pinned block");
+        assertGt(address(factory).code.length, 0, "setUp should complete on latest head without forced roll");
     }
 
     function test_bscFork_deterministic_busd_depositWithdraw() public {
@@ -45,22 +56,51 @@ contract VaultForkBscVenusTest is VaultForkBscBase {
     }
 
     function test_bscFork_smoke_venus_supply_viaAdapter() public {
-        uint256 amount = 2_000e18;
-        (bool ok, MandatedVaultClone v, address underlying, address vToken, bytes memory reason) = _trySupplyAny(amount);
+        BscTestnetDeploymentJson.Config memory cfg = BscTestnetDeploymentJson.read(vm);
 
+        uint256 amount = 2_000e18;
+        MandatedVaultClone v = _createVault(BSC_VENUS_BUSD_UNDERLYING);
+        deal(BSC_VENUS_BUSD_UNDERLYING, address(v), amount);
+
+        (bytes32 root, bytes32[] memory underlyingProof, bytes32[] memory adapterProof) =
+            _rootForPair(BSC_VENUS_BUSD_UNDERLYING, cfg.venus.adapter);
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
+        actions[0] = IERCXXXXMandatedVault.Action(
+            BSC_VENUS_BUSD_UNDERLYING, 0, abi.encodeCall(IERC20.approve, (cfg.venus.adapter, amount))
+        );
+        actions[1] = IERCXXXXMandatedVault.Action(
+            cfg.venus.adapter, 0, abi.encodeCall(VenusAdapter.supply, (BSC_VBUSD, amount))
+        );
+
+        bytes32[][] memory proofs = new bytes32[][](2);
+        proofs[0] = underlyingProof;
+        proofs[1] = adapterProof;
+
+        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
+        (bool ok, bytes memory ret) = _execRaw(v, m, actions, proofs);
         if (!ok) {
+            assertEq(_revertSelector(ret), IERCXXXXMandatedVault.ActionCallFailed.selector, "unexpected selector");
+            (uint256 idx, bytes memory reason) = _decodeActionCallFailed(ret);
+            assertEq(idx, 1, "unexpected failing action");
             if (_isVenusProtocolUnavailable(reason)) {
                 vm.skip(
                     true,
-                    _unavailableMessage("venus supply unavailable on current fork head", underlying, vToken, reason)
+                    _unavailableMessage(
+                        "venus supply unavailable on current fork head", BSC_VENUS_BUSD_UNDERLYING, BSC_VBUSD, reason
+                    )
                 );
                 return;
             }
-            revert(_unavailableMessage("venus supply failed (not protocol issue)", underlying, vToken, reason));
+            revert(
+                _unavailableMessage(
+                    "venus supply failed (not protocol issue)", BSC_VENUS_BUSD_UNDERLYING, BSC_VBUSD, reason
+                )
+            );
         }
 
-        assertEq(IERC20(underlying).balanceOf(address(v)), 0, "all underlying supplied");
-        assertGt(IERC20(vToken).balanceOf(address(v)), 0, "vToken should be received");
+        assertEq(IERC20(BSC_VENUS_BUSD_UNDERLYING).balanceOf(address(v)), 0, "all underlying supplied");
+        assertGt(IERC20(BSC_VBUSD).balanceOf(address(v)), 0, "vToken should be received");
     }
 
     function test_bscFork_smoke_venus_withdraw_viaAdapter() public {

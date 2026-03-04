@@ -9,22 +9,24 @@ import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
 
 import {BSC_BUSD, BSC_WBNB, BSC_BUSD_WBNB_FEE} from "./helpers/BscForkConstants.sol";
 import {VaultForkBscBase} from "./VaultForkBsc.Base.t.sol";
+import {BscTestnetDeploymentJson} from "./helpers/BscTestnetDeploymentJson.sol";
 
 contract VaultForkBscPancakeTest is VaultForkBscBase {
     function test_bscFork_smoke_pancake_swap_busd_to_wbnb() public {
+        BscTestnetDeploymentJson.Config memory cfg = BscTestnetDeploymentJson.read(vm);
+
         MandatedVaultClone v = _createVault(BSC_BUSD);
         uint256 amountIn = 1_000e18;
         deal(BSC_BUSD, address(v), amountIn);
 
         (bytes32 root, bytes32[] memory busdProof, bytes32[] memory adapterProof) =
-            _rootForPair(BSC_BUSD, address(pancakeAdapter));
+            _rootForPair(BSC_BUSD, cfg.pancake.adapter);
 
         IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(
-            BSC_BUSD, 0, abi.encodeCall(IERC20.approve, (address(pancakeAdapter), amountIn))
-        );
+        actions[0] =
+            IERCXXXXMandatedVault.Action(BSC_BUSD, 0, abi.encodeCall(IERC20.approve, (cfg.pancake.adapter, amountIn)));
         actions[1] = IERCXXXXMandatedVault.Action(
-            address(pancakeAdapter),
+            cfg.pancake.adapter,
             0,
             abi.encodeCall(
                 PancakeSwapV3Adapter.swap, (BSC_BUSD, BSC_WBNB, BSC_BUSD_WBNB_FEE, block.timestamp + 300, amountIn, 1)
@@ -36,7 +38,20 @@ contract VaultForkBscPancakeTest is VaultForkBscBase {
         proofs[1] = adapterProof;
 
         IERCXXXXMandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
-        _exec(v, m, actions, proofs);
+        (bool ok, bytes memory ret) = _execRaw(v, m, actions, proofs);
+        if (!ok) {
+            assertEq(_revertSelector(ret), IERCXXXXMandatedVault.ActionCallFailed.selector, "unexpected selector");
+            (uint256 idx, bytes memory reason) = _decodeActionCallFailed(ret);
+            assertEq(idx, 1, "unexpected failing action");
+            if (_isPancakeProtocolUnavailable(reason)) {
+                vm.skip(
+                    true,
+                    _unavailableMessage("pancake swap unavailable on current fork head", BSC_BUSD, BSC_WBNB, reason)
+                );
+                return;
+            }
+            revert(_unavailableMessage("pancake swap failed (not protocol issue)", BSC_BUSD, BSC_WBNB, reason));
+        }
 
         assertEq(IERC20(BSC_BUSD).balanceOf(address(v)), 0, "BUSD should be spent");
         assertGt(IERC20(BSC_WBNB).balanceOf(address(v)), 0, "WBNB should be received");
