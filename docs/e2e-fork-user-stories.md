@@ -73,6 +73,59 @@ forge test
 
 ---
 
+## 如何运行 BSC Fork 测试
+
+### 默认策略：使用 fork head
+
+BSC fork 测试默认以当前 provider 的最新区块 head 运行，不强制回滚到固定历史块。
+
+原因：
+
+1. 公共 BSC RPC 经常不保留完整历史状态，强制回滚历史块容易出现基础设施错误（例如 `missing trie node`）。
+2. Venus 和 Pancake 在测试网状态会持续变化，head 模式更贴近“当前已部署现实”，适合 smoke 与回归。
+3. 当需要复现时，再通过环境变量显式固定 `BSC_FORK_BLOCK`，避免默认路径被历史状态可用性影响。
+
+### 可复制命令
+
+仅运行 BSC fork 测试（默认 head）：
+
+```
+BSC_RPC_URL=<your-bsc-testnet-rpc> \
+forge test --match-test '^test_bscFork_' --fork-url "$BSC_RPC_URL" --chain-id 97
+```
+
+固定区块复现（可选 `BSC_FORK_BLOCK`）：
+
+```
+BSC_RPC_URL=<your-bsc-testnet-rpc> \
+BSC_FORK_BLOCK=93533855 \
+forge test --match-test '^test_bscFork_' --fork-url "$BSC_RPC_URL" --chain-id 97
+```
+
+固定区块并要求启动即在该块（更严格复现）：
+
+```
+BSC_RPC_URL=<your-bsc-testnet-rpc> \
+BSC_FORK_BLOCK=93533855 \
+forge test --match-test '^test_bscFork_' --fork-url "$BSC_RPC_URL" --fork-block-number "$BSC_FORK_BLOCK" --chain-id 97
+```
+
+### 失败排查与 RPC 建议
+
+如果出现以下现象：
+
+- `missing trie node`
+- `header not found`
+- 在固定块模式下频繁 `failed to roll fork to BSC_FORK_BLOCK`
+
+优先按顺序处理：
+
+1. 先去掉 `BSC_FORK_BLOCK`，确认默认 head 模式可运行。
+2. 替换为稳定性更高的 BSC testnet RPC（优先付费/归档节点）。
+3. 如需固定块复现，使用支持历史状态查询的 RPC，再重新执行固定块命令。
+
+---
+
 ## Part 1: Real Token ERC-4626 Compatibility (3 Tests)
 
 ### Story 1.1: Deposit / Withdraw with Real USDC
