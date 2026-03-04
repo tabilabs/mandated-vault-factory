@@ -7,6 +7,12 @@ via_ir = true
 optimizer = true
 optimizer_runs = 200
 
+# Allow fork tests to read deployment artifacts (e.g. deployments/bsc-testnet.json).
+# Keep permissions minimal: read-only, scoped to ./deployments.
+fs_permissions = [
+    { access = "read", path = "./deployments" }
+]
+
 remappings = [
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
     "@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
