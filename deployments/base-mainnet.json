@@ -1,0 +1,53 @@
+{
+  "chainId": 8453,
+  "network": "base-mainnet",
+  "snapshotDate": "2026-03-10",
+  "factory": "<fill-from-official-deployment>",
+  "factoryCodehash": "<fill-from-onchain-codehash>",
+  "factoryLeaf": "<fill-from-onchain-leaf>",
+  "adapters": {
+    "aave": "<fill-from-deployed-adapter>",
+    "morpho": "<fill-from-deployed-adapter>",
+    "uniswap": "<fill-from-deployed-adapter>",
+    "aerodrome": "<fill-from-deployed-adapter>",
+    "compound": "<fill-from-deployed-adapter>"
+  },
+  "adapterCodehashes": {
+    "aave": "<fill-from-onchain-codehash>",
+    "morpho": "<fill-from-onchain-codehash>",
+    "uniswap": "<fill-from-onchain-codehash>",
+    "aerodrome": "<fill-from-onchain-codehash>",
+    "compound": "<fill-from-onchain-codehash>"
+  },
+  "adapterLeaves": {
+    "aave": "<fill-from-onchain-leaf>",
+    "morpho": "<fill-from-onchain-leaf>",
+    "uniswap": "<fill-from-onchain-leaf>",
+    "aerodrome": "<fill-from-onchain-leaf>",
+    "compound": "<fill-from-onchain-leaf>"
+  },
+  "protocols": {
+    "aave": {
+      "source": "https://aave.com/docs/resources/addresses",
+      "addressBook": "https://github.com/aave-dao/aave-address-book/blob/main/src/AaveV3Base.sol",
+      "status": "pending-onchain-verification"
+    },
+    "morpho": {
+      "source": "https://docs.morpho.org/get-started/resources/addresses/",
+      "status": "pending-onchain-verification"
+    },
+    "uniswap": {
+      "source": "https://docs.uniswap.org/contracts/v3/reference/deployments/base-deployments",
+      "status": "pending-onchain-verification"
+    },
+    "aerodrome": {
+      "source": "https://aerodrome.limited/pages/security.html",
+      "status": "pending-onchain-verification"
+    },
+    "compound": {
+      "source": "https://docs.compound.finance/",
+      "deployments": "https://github.com/compound-finance/comet/tree/main/deployments",
+      "status": "pending-onchain-verification"
+    }
+  }
+}
