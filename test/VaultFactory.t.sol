@@ -679,6 +679,27 @@ contract VaultFactoryTest is Test {
         extensionsHash = keccak256(extensions);
     }
 
+    function _buildAbsoluteLossExt(uint256 maxSingleAbsoluteLoss)
+        internal
+        pure
+        returns (bytes memory extensions, bytes32 extensionsHash)
+    {
+        bytes4 absoluteLossLimitId = bytes4(keccak256("erc-xxxx:absolute-loss-limit@v1"));
+        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](1);
+        exts[0] = IERCXXXXMandatedVault.Extension({
+            id: absoluteLossLimitId, required: false, data: abi.encode(maxSingleAbsoluteLoss)
+        });
+        extensions = abi.encode(exts);
+        extensionsHash = keccak256(extensions);
+    }
+
+    function _buildOptionalUnknownExt() internal pure returns (bytes memory extensions, bytes32 extensionsHash) {
+        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](1);
+        exts[0] = IERCXXXXMandatedVault.Extension({id: bytes4(0xabcdef01), required: false, data: bytes("")});
+        extensions = abi.encode(exts);
+        extensionsHash = keccak256(extensions);
+    }
+
     function test_selectorAllowlist_validExecution() public {
         MandatedVaultClone vault = _createVault();
         token.mint(address(vault), 1_000_000e18);
@@ -737,6 +758,437 @@ contract VaultFactoryTest is Test {
         bytes4 selectorAllowlistId = bytes4(keccak256("erc-xxxx:selector-allowlist@v1"));
         assertTrue(vault.supportsExtension(selectorAllowlistId), "should support selector allowlist");
         assertFalse(vault.supportsExtension(bytes4(0xdeadbeef)), "should not support random extension");
+    }
+
+    function test_supportsExtension_absoluteLossLimit() public {
+        MandatedVaultClone vault = _createVault();
+        bytes4 absoluteLossLimitId = bytes4(keccak256("erc-xxxx:absolute-loss-limit@v1"));
+        assertTrue(vault.supportsExtension(absoluteLossLimitId), "should support absolute loss limit");
+    }
+
+    function test_absoluteLossLimit_validWithinLimit() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildAbsoluteLossExt(100_000e18);
+
+        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 50_000e18))
+        });
+
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+        bytes memory sig = _signMandate(vault, mandate);
+
+        vm.prank(executor);
+        (uint256 pre, uint256 post) = vault.execute(mandate, actions, sig, proofs, extensions);
+        assertEq(pre, 1_000_000e18, "pre assets mismatch");
+        assertEq(post, 950_000e18, "post assets mismatch");
+    }
+
+    function test_absoluteLossLimit_revertWhenExceeded() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildAbsoluteLossExt(10_000e18);
+
+        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 50_000e18))
+        });
+
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+        bytes memory sig = _signMandate(vault, mandate);
+
+        vm.prank(executor);
+        vm.expectRevert(IERCXXXXMandatedVault.AbsoluteLossExceeded.selector);
+        vault.execute(mandate, actions, sig, proofs, extensions);
+    }
+
+    function test_absoluteLossLimit_hashBinding_tamperReverts() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (, bytes32 extensionsHash) = _buildAbsoluteLossExt(100_000e18);
+        (bytes memory tamperedExtensions,) = _buildAbsoluteLossExt(10_000e18);
+
+        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 50_000e18))
+        });
+
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+        bytes memory sig = _signMandate(vault, mandate);
+
+        vm.prank(executor);
+        vm.expectRevert(IERCXXXXMandatedVault.ExtensionsHashMismatch.selector);
+        vault.execute(mandate, actions, sig, proofs, tamperedExtensions);
+    }
+
+    function test_selectorOnlyExtension_withLoss_stillUsesBpsOnly() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildSelectorExt(address(drainer), DrainAdapter.drain.selector);
+
+        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 10_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        (uint256 pre, uint256 post) = vault.execute(mandate, actions, sig, proofs, extensions);
+        assertEq(pre, 1_000_000e18, "pre assets mismatch");
+        assertEq(post, 990_000e18, "post assets mismatch");
+    }
+
+    function test_optionalUnknownExtension_withLoss_stillUsesBpsOnly() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildOptionalUnknownExt();
+
+        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 10_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        (uint256 pre, uint256 post) = vault.execute(mandate, actions, sig, proofs, extensions);
+        assertEq(pre, 1_000_000e18, "pre assets mismatch");
+        assertEq(post, 990_000e18, "post assets mismatch");
+    }
+
+    function test_absoluteLossLimit_equalThreshold_succeeds() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildAbsoluteLossExt(50_000e18);
+
+        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 50_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        (uint256 pre, uint256 post) = vault.execute(mandate, actions, sig, proofs, extensions);
+        assertEq(pre, 1_000_000e18, "pre assets mismatch");
+        assertEq(post, 950_000e18, "post assets mismatch");
+    }
+
+    function test_selectorAndAbsoluteCanonical_bothEnforced() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+
+        bytes4 absoluteLossLimitId = bytes4(keccak256("erc-xxxx:absolute-loss-limit@v1"));
+        bytes4 selectorAllowlistId = bytes4(keccak256("erc-xxxx:selector-allowlist@v1"));
+        assertLt(uint32(absoluteLossLimitId), uint32(selectorAllowlistId), "expected canonical id order");
+
+        bytes32 selectorLeaf = keccak256(abi.encode(address(drainer), DrainAdapter.drain.selector));
+        bytes32[][] memory selectorProofs = new bytes32[][](1);
+        selectorProofs[0] = new bytes32[](0);
+
+        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](2);
+        exts[0] = IERCXXXXMandatedVault.Extension({
+            id: absoluteLossLimitId,
+            required: false,
+            data: abi.encode(uint256(20_000e18))
+        });
+        exts[1] = IERCXXXXMandatedVault.Extension({
+            id: selectorAllowlistId,
+            required: false,
+            data: abi.encode(selectorLeaf, selectorProofs)
+        });
+
+        bytes memory extensions = abi.encode(exts);
+        bytes32 extensionsHash = keccak256(extensions);
+
+        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 10_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        (uint256 pre, uint256 post) = vault.execute(mandate, actions, sig, proofs, extensions);
+        assertEq(pre, 1_000_000e18, "pre assets mismatch");
+        assertEq(post, 990_000e18, "post assets mismatch");
+    }
+
+    function test_selectorAndAbsoluteCanonical_selectorViolationRevertsSelectorNotAllowed() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+
+        bytes4 absoluteLossLimitId = bytes4(keccak256("erc-xxxx:absolute-loss-limit@v1"));
+        bytes4 selectorAllowlistId = bytes4(keccak256("erc-xxxx:selector-allowlist@v1"));
+        assertLt(uint32(absoluteLossLimitId), uint32(selectorAllowlistId), "expected canonical id order");
+
+        bytes32 selectorLeaf = keccak256(abi.encode(address(drainer), MockAdapter.alwaysReverts.selector));
+        bytes32[][] memory selectorProofs = new bytes32[][](1);
+        selectorProofs[0] = new bytes32[](0);
+
+        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](2);
+        exts[0] = IERCXXXXMandatedVault.Extension({
+            id: absoluteLossLimitId,
+            required: false,
+            data: abi.encode(uint256(100_000e18))
+        });
+        exts[1] = IERCXXXXMandatedVault.Extension({
+            id: selectorAllowlistId,
+            required: false,
+            data: abi.encode(selectorLeaf, selectorProofs)
+        });
+
+        bytes memory extensions = abi.encode(exts);
+        bytes32 extensionsHash = keccak256(extensions);
+
+        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 10_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 10_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        vm.expectPartialRevert(AdapterLib.SelectorNotAllowed.selector);
+        vault.execute(mandate, actions, sig, proofs, extensions);
+    }
+
+    function test_selectorAndAbsoluteCanonical_absoluteViolationRevertsAbsoluteLossExceeded() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+
+        bytes4 absoluteLossLimitId = bytes4(keccak256("erc-xxxx:absolute-loss-limit@v1"));
+        bytes4 selectorAllowlistId = bytes4(keccak256("erc-xxxx:selector-allowlist@v1"));
+        assertLt(uint32(absoluteLossLimitId), uint32(selectorAllowlistId), "expected canonical id order");
+
+        bytes32 selectorLeaf = keccak256(abi.encode(address(drainer), DrainAdapter.drain.selector));
+        bytes32[][] memory selectorProofs = new bytes32[][](1);
+        selectorProofs[0] = new bytes32[](0);
+
+        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](2);
+        exts[0] = IERCXXXXMandatedVault.Extension({
+            id: absoluteLossLimitId,
+            required: false,
+            data: abi.encode(uint256(1e18))
+        });
+        exts[1] = IERCXXXXMandatedVault.Extension({
+            id: selectorAllowlistId,
+            required: false,
+            data: abi.encode(selectorLeaf, selectorProofs)
+        });
+
+        bytes memory extensions = abi.encode(exts);
+        bytes32 extensionsHash = keccak256(extensions);
+
+        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 10_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 10_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        vm.expectRevert(IERCXXXXMandatedVault.AbsoluteLossExceeded.selector);
+        vault.execute(mandate, actions, sig, proofs, extensions);
+    }
+
+    function test_drawdownAndAbsoluteBothExceeded_revertsDrawdownFirst() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildAbsoluteLossExt(1e18);
+
+        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 500,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        actions[0] = IERCXXXXMandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 60_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        vm.expectRevert(IERCXXXXMandatedVault.DrawdownExceeded.selector);
+        vault.execute(mandate, actions, sig, proofs, extensions);
     }
 
     // =========== Cumulative Drawdown ===========

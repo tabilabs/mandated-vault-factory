@@ -365,6 +365,121 @@ contract VaultBranchTest is Test {
         hash = keccak256(ext);
     }
 
+    function _buildAbsoluteLossExt(uint256 maxSingleAbsoluteLoss, bool required)
+        internal
+        pure
+        returns (bytes memory ext, bytes32 hash)
+    {
+        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](1);
+        exts[0] = IERCXXXXMandatedVault.Extension({
+            id: bytes4(keccak256("erc-xxxx:absolute-loss-limit@v1")),
+            required: required,
+            data: abi.encode(maxSingleAbsoluteLoss)
+        });
+        ext = abi.encode(exts);
+        hash = keccak256(ext);
+    }
+
+    function _buildAbsoluteLossAndSelectorNonCanonicalExt(uint256 maxSingleAbsoluteLoss)
+        internal
+        pure
+        returns (bytes memory ext, bytes32 hash)
+    {
+        bytes32 root = keccak256("dummy");
+        bytes32[][] memory sp = new bytes32[][](1);
+        sp[0] = new bytes32[](0);
+
+        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](2);
+        exts[0] = IERCXXXXMandatedVault.Extension({
+            id: bytes4(keccak256("erc-xxxx:selector-allowlist@v1")),
+            required: false,
+            data: abi.encode(root, sp)
+        });
+        exts[1] = IERCXXXXMandatedVault.Extension({
+            id: bytes4(keccak256("erc-xxxx:absolute-loss-limit@v1")),
+            required: false,
+            data: abi.encode(maxSingleAbsoluteLoss)
+        });
+
+        ext = abi.encode(exts);
+        hash = keccak256(ext);
+    }
+
+    function test_absoluteLossLimit_invalidEncoding_revert() public {
+        MandatedVaultClone v = _vault();
+        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](1);
+        exts[0] = IERCXXXXMandatedVault.Extension({
+            id: bytes4(keccak256("erc-xxxx:absolute-loss-limit@v1")),
+            required: false,
+            data: hex"deadbeef"
+        });
+        bytes memory ext = abi.encode(exts);
+
+        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, 0);
+        m.extensionsHash = keccak256(ext);
+        bytes memory sig = _sign(v, m);
+
+        vm.prank(executor);
+        vm.expectRevert(IERCXXXXMandatedVault.InvalidExtensionsEncoding.selector);
+        v.execute(m, _actions(), sig, _proofs(), ext);
+    }
+
+    function test_absoluteLossLimit_required_supported_path() public {
+        MandatedVaultClone v = _vault();
+        (bytes memory ext,) = _buildAbsoluteLossExt(1e18, true);
+
+        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, 0);
+        m.extensionsHash = keccak256(ext);
+        bytes memory sig = _sign(v, m);
+
+        vm.prank(executor);
+        v.execute(m, _actions(), sig, _proofs(), ext);
+    }
+
+    function test_absoluteLossLimit_nonCanonicalWithSelector_revert() public {
+        MandatedVaultClone v = _vault();
+        (bytes memory ext,) = _buildAbsoluteLossAndSelectorNonCanonicalExt(1e18);
+
+        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, 0);
+        m.extensionsHash = keccak256(ext);
+        bytes memory sig = _sign(v, m);
+
+        vm.prank(executor);
+        vm.expectRevert(IERCXXXXMandatedVault.ExtensionsNotCanonical.selector);
+        v.execute(m, _actions(), sig, _proofs(), ext);
+    }
+
+    function test_absoluteLossLimit_zeroThreshold_anyLossReverts() public {
+        MandatedVaultClone v = _vault();
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory ext,) = _buildAbsoluteLossExt(0, false);
+
+        IERCXXXXMandatedVault.Mandate memory m = IERCXXXXMandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: v.authorityEpoch(),
+            maxDrawdownBps: 10_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: keccak256(ext)
+        });
+        bytes memory sig = _sign(v, m);
+
+        IERCXXXXMandatedVault.Action[] memory acts = new IERCXXXXMandatedVault.Action[](1);
+        acts[0] = IERCXXXXMandatedVault.Action(
+            address(drainer), 0, abi.encodeCall(DrainAdapter.drain, (address(token), address(v), 1e18))
+        );
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        vm.prank(executor);
+        vm.expectRevert(IERCXXXXMandatedVault.AbsoluteLossExceeded.selector);
+        v.execute(m, acts, sig, proofs, ext);
+    }
+
     // ─── P1: Sweep failure ──────────────────────────────────────────
 
     function test_nativeSweepFailed_revert() public {

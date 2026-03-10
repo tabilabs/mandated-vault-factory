@@ -53,6 +53,9 @@ contract MandatedVaultClone is
     ///      for the draft phase. Deployed vaults will retain the draft identifier.
     bytes4 internal constant _SELECTOR_ALLOWLIST_ID = bytes4(keccak256("erc-xxxx:selector-allowlist@v1"));
 
+    /// @dev Extension identifier for the absolute single-loss limit extension.
+    bytes4 internal constant _ABSOLUTE_LOSS_LIMIT_ID = bytes4(keccak256("erc-xxxx:absolute-loss-limit@v1"));
+
     /// @dev EIP-712 typehash for the Mandate struct.
     bytes32 internal constant _MANDATE_TYPEHASH = keccak256(
         "Mandate(address executor,uint256 nonce,uint48 deadline,uint64 authorityEpoch,"
@@ -276,7 +279,7 @@ contract MandatedVaultClone is
         bytes calldata extensions
     ) external nonReentrant returns (uint256 preAssets, uint256 postAssets) {
         // -- Steps 1-12a: Validation (caches authority + hashes for reuse) ----
-        (address authority_, bytes32 mandateHash_, bytes32 actionsDigest_) =
+        (address authority_, bytes32 mandateHash_, bytes32 actionsDigest_, uint256 maxSingleAbsoluteLoss_) =
             _validateMandate(mandate, actions, signature, adapterProofs, extensions);
 
         // -- Step 13: Pre-state snapshot & epoch initialization ----------------
@@ -290,7 +293,7 @@ contract MandatedVaultClone is
         _executeActions(actions);
 
         // -- Step 15-17: Post-state, circuit breaker & event ------------------
-        postAssets = _postExecution(mandate, preAssets, authority_, mandateHash_, actionsDigest_);
+        postAssets = _postExecution(mandate, preAssets, authority_, mandateHash_, actionsDigest_, maxSingleAbsoluteLoss_);
     }
 
     /// @dev Validates mandate fields, signature, nonce, and payload binding
@@ -306,7 +309,7 @@ contract MandatedVaultClone is
         bytes calldata signature,
         bytes32[][] calldata adapterProofs,
         bytes calldata extensions
-    ) internal returns (address authority_, bytes32 mandateHash_, bytes32 actionsDigest_) {
+    ) internal returns (address authority_, bytes32 mandateHash_, bytes32 actionsDigest_, uint256 maxSingleAbsoluteLoss_) {
         // -- Steps 1-5a: Mandate field validation -----------------------------
         MandateLib.validateFields(
             mandate,
@@ -339,7 +342,7 @@ contract MandatedVaultClone is
         MandateLib.validatePayloadDigest(mandate.payloadDigest, actionsDigest_);
 
         // -- Steps 12-12a: Adapter & selector allowlists ----------------------
-        _validateAllowlists(mandate, actions, adapterProofs, extensions);
+        maxSingleAbsoluteLoss_ = _validateAllowlists(mandate, actions, adapterProofs, extensions);
     }
 
     /// @dev Validates adapter Merkle proofs and optional selector allowlist
@@ -350,14 +353,24 @@ contract MandatedVaultClone is
         Action[] calldata actions,
         bytes32[][] calldata adapterProofs,
         bytes calldata extensions
-    ) internal view {
+    ) internal view returns (uint256 maxSingleAbsoluteLoss) {
+        maxSingleAbsoluteLoss = type(uint256).max;
+
         // -- Step 12: Adapter allowlist ---------------------------------------
         AdapterLib.validateAdapters(actions, adapterProofs, mandate.allowedAdaptersRoot, MAX_ADAPTER_PROOF_DEPTH);
 
         // -- Step 12a: Selector allowlist (from extensions) -------------------
         if (extensions.length != 0) {
-            (bool hasSelectorAllowlist, bytes32 selectorRoot, bytes32[][] memory selectorProofs) =
-                _parseExtensions(extensions);
+            (
+                bool hasSelectorAllowlist,
+                bytes32 selectorRoot,
+                bytes32[][] memory selectorProofs,
+                bool hasAbsoluteLossLimit,
+                uint256 absoluteLossLimit
+            ) = _parseExtensions(extensions);
+            if (hasAbsoluteLossLimit) {
+                maxSingleAbsoluteLoss = absoluteLossLimit;
+            }
             if (hasSelectorAllowlist) {
                 AdapterLib.enforceSelectorAllowlist(actions, selectorRoot, selectorProofs, MAX_SELECTOR_PROOF_DEPTH);
             }
@@ -394,10 +407,12 @@ contract MandatedVaultClone is
         uint256 preAssets,
         address authority_,
         bytes32 mandateHash_,
-        bytes32 actionsDigest_
+        bytes32 actionsDigest_,
+        uint256 maxSingleAbsoluteLoss
     ) internal returns (uint256 postAssets) {
         postAssets = totalAssets();
         DrawdownLib.checkSingleDrawdown(preAssets, postAssets, mandate.maxDrawdownBps);
+        DrawdownLib.checkSingleAbsoluteLoss(preAssets, postAssets, maxSingleAbsoluteLoss);
         _epochAssets = DrawdownLib.checkCumulativeDrawdown(_epochAssets, postAssets, mandate.maxCumulativeDrawdownBps);
         emit MandateExecuted(mandateHash_, authority_, msg.sender, actionsDigest_, preAssets, postAssets);
     }
@@ -406,17 +421,25 @@ contract MandatedVaultClone is
 
     /// @dev Returns true if the given extension ID is supported by this vault.
     function _supportsExtension(bytes4 id) internal view virtual returns (bool) {
-        return id == _SELECTOR_ALLOWLIST_ID;
+        return id == _SELECTOR_ALLOWLIST_ID || id == _ABSOLUTE_LOSS_LIMIT_ID;
     }
 
     /// @dev Parses and validates the extensions blob. Uses try/catch for safe ABI decoding.
     /// @return hasSelectorAllowlist Whether the selector allowlist extension is present.
     /// @return selectorRoot        The Merkle root for selector allowlist (if present).
-    /// @return selectorProofs      The per-action Merkle proofs for selector allowlist (if present).
+    /// @return selectorProofs       The per-action Merkle proofs for selector allowlist (if present).
+    /// @return hasAbsoluteLossLimit  Whether the absolute single-loss limit extension is present.
+    /// @return maxSingleAbsoluteLoss The max absolute single-loss threshold when extension is present.
     function _parseExtensions(bytes calldata extensions)
         internal
         view
-        returns (bool hasSelectorAllowlist, bytes32 selectorRoot, bytes32[][] memory selectorProofs)
+        returns (
+            bool hasSelectorAllowlist,
+            bytes32 selectorRoot,
+            bytes32[][] memory selectorProofs,
+            bool hasAbsoluteLossLimit,
+            uint256 maxSingleAbsoluteLoss
+        )
     {
         try this.decodeExtensions(extensions) returns (Extension[] memory exts) {
             if (exts.length > MAX_EXTENSIONS) revert TooManyExtensions(exts.length);
@@ -437,6 +460,13 @@ contract MandatedVaultClone is
                     try this.decodeSelectorAllowlist(exts[i].data) returns (bytes32 root, bytes32[][] memory proofs) {
                         selectorRoot = root;
                         selectorProofs = proofs;
+                    } catch {
+                        revert InvalidExtensionsEncoding();
+                    }
+                } else if (exts[i].id == _ABSOLUTE_LOSS_LIMIT_ID) {
+                    hasAbsoluteLossLimit = true;
+                    try this.decodeAbsoluteLossLimit(exts[i].data) returns (uint256 threshold) {
+                        maxSingleAbsoluteLoss = threshold;
                     } catch {
                         revert InvalidExtensionsEncoding();
                     }
@@ -467,6 +497,13 @@ contract MandatedVaultClone is
         returns (bytes32 root, bytes32[][] memory proofs)
     {
         (root, proofs) = abi.decode(data, (bytes32, bytes32[][]));
+    }
+
+    /// @notice Decodes ABI-encoded absolute loss limit extension data. External for try/catch usage.
+    /// @param data The ABI-encoded uint256 threshold.
+    /// @return maxSingleAbsoluteLoss The decoded single absolute loss threshold.
+    function decodeAbsoluteLossLimit(bytes calldata data) external pure returns (uint256 maxSingleAbsoluteLoss) {
+        maxSingleAbsoluteLoss = abi.decode(data, (uint256));
     }
 
     /// @dev Copies return data from the last external call into a `bytes memory`.

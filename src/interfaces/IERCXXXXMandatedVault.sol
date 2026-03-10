@@ -79,6 +79,7 @@ interface IERCXXXXMandatedVault {
     error InvalidAdaptersRoot();
     error DrawdownExceeded();
     error CumulativeDrawdownExceeded();
+    error AbsoluteLossExceeded();
     error UnboundedOpenMandate();
     error EmptyActions();
     error NonZeroActionValue();

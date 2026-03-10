@@ -20,6 +20,22 @@ library DrawdownLib {
         }
     }
 
+    /// @dev Checks that single-execution absolute loss does not exceed the mandate's limit.
+    /// @param preAssets              Total assets before action execution.
+    /// @param postAssets             Total assets after action execution.
+    /// @param maxSingleAbsoluteLoss  Maximum allowed absolute single-execution loss.
+    function checkSingleAbsoluteLoss(uint256 preAssets, uint256 postAssets, uint256 maxSingleAbsoluteLoss)
+        internal
+        pure
+    {
+        if (preAssets > postAssets) {
+            uint256 loss = preAssets - postAssets;
+            if (loss > maxSingleAbsoluteLoss) {
+                revert IERCXXXXMandatedVault.AbsoluteLossExceeded();
+            }
+        }
+    }
+
     /// @dev Checks that cumulative drawdown since epoch start does not exceed the mandate's limit.
     ///      Also updates the epoch high-water mark if postAssets exceeds it.
     /// @param epochAssets              Epoch high-water mark (assets at epoch start or last HWM).
