@@ -27,7 +27,7 @@ forge test -vvv
 
 ## 3. Recommended Reading Order
 
-1. `src/interfaces/IERCXXXXMandatedVault.sol` (domain interface and error model)
+1. `src/interfaces/IERC8192MandatedVault.sol` (domain interface and error model)
 2. `src/VaultFactory.sol` + `src/interfaces/IVaultFactory.sol` (deployment boundary)
 3. `src/MandatedVaultClone.sol` (core execution path)
 4. `src/libs/MandateLib.sol` / `src/libs/AdapterLib.sol` / `src/libs/DrawdownLib.sol` (isolated validation logic)

@@ -28,7 +28,9 @@ contract VaultForkBaseDeployedConsistencyTest is Test {
 
     function test_baseFork_deployedConsistency_factory_top5Adapters() public {
         if (!BaseDeploymentJson.isComplete(vm)) {
-            vm.skip(true, "base-mainnet deployment record incomplete: protocol anchors exist, project deployment not filled");
+            vm.skip(
+                true, "base-mainnet deployment record incomplete: protocol anchors exist, project deployment not filled"
+            );
             return;
         }
 

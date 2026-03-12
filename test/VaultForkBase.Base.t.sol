@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {VaultFactory} from "../src/VaultFactory.sol";
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
-import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../src/interfaces/IERC8192MandatedVault.sol";
 
 import {
     BASE_CHAIN_ID,
@@ -82,7 +82,7 @@ abstract contract VaultForkBaseBase is Test {
         );
     }
 
-    function _sign(MandatedVaultClone v, IERCXXXXMandatedVault.Mandate memory m) internal view returns (bytes memory) {
+    function _sign(MandatedVaultClone v, IERC8192MandatedVault.Mandate memory m) internal view returns (bytes memory) {
         (uint8 vv, bytes32 r, bytes32 s) = vm.sign(authorityKey, v.hashMandate(m));
         return abi.encodePacked(r, s, vv);
     }
@@ -102,9 +102,9 @@ abstract contract VaultForkBaseBase is Test {
     function _mandate(MandatedVaultClone v, uint256 nonce, uint16 maxDrawdownBps, bytes32 adaptersRoot)
         internal
         view
-        returns (IERCXXXXMandatedVault.Mandate memory)
+        returns (IERC8192MandatedVault.Mandate memory)
     {
-        return IERCXXXXMandatedVault.Mandate({
+        return IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: nonce,
             deadline: 0, // 0 = no mandate expiry; fork smoke focuses on protocol integration rather than time-bounded auth UX.
@@ -120,9 +120,9 @@ abstract contract VaultForkBaseBase is Test {
     function _unwindMandate(MandatedVaultClone v, uint256 nonce, bytes32 adaptersRoot)
         internal
         view
-        returns (IERCXXXXMandatedVault.Mandate memory)
+        returns (IERC8192MandatedVault.Mandate memory)
     {
-        return IERCXXXXMandatedVault.Mandate({
+        return IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: nonce,
             deadline: 0,
@@ -137,8 +137,8 @@ abstract contract VaultForkBaseBase is Test {
 
     function _exec(
         MandatedVaultClone v,
-        IERCXXXXMandatedVault.Mandate memory m,
-        IERCXXXXMandatedVault.Action[] memory actions,
+        IERC8192MandatedVault.Mandate memory m,
+        IERC8192MandatedVault.Action[] memory actions,
         bytes32[][] memory proofs
     ) internal returns (uint256 pre, uint256 post) {
         bytes memory sig = _sign(v, m);

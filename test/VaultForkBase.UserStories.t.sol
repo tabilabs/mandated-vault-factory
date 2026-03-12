@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
-import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../src/interfaces/IERC8192MandatedVault.sol";
 
 import {
     BASE_USDC,
@@ -38,11 +38,11 @@ contract VaultForkBaseUserStoriesTest is VaultForkBaseBase {
         (bytes32 root, bytes32[] memory usdcProof, bytes32[] memory aaveProof) = _rootForPair(BASE_USDC, BASE_AAVE_POOL);
 
         {
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+            actions[0] = IERC8192MandatedVault.Action(
                 BASE_USDC, 0, abi.encodeCall(IERC20.approve, (BASE_AAVE_POOL, depositAmt))
             );
-            actions[1] = IERCXXXXMandatedVault.Action(
+            actions[1] = IERC8192MandatedVault.Action(
                 BASE_AAVE_POOL, 0, abi.encodeCall(IAavePoolLike.supply, (BASE_USDC, depositAmt, address(v), 0))
             );
 
@@ -58,8 +58,8 @@ contract VaultForkBaseUserStoriesTest is VaultForkBaseBase {
         assertGt(collateral, 0, "Aave collateral should exist after supply");
 
         {
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+            actions[0] = IERC8192MandatedVault.Action(
                 BASE_AAVE_POOL, 0, abi.encodeCall(IAavePoolLike.withdraw, (BASE_USDC, type(uint256).max, address(v)))
             );
 
@@ -100,11 +100,11 @@ contract VaultForkBaseUserStoriesTest is VaultForkBaseBase {
             _rootForPair(BASE_USDC, BASE_COMPOUND_COMET);
 
         {
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+            actions[0] = IERC8192MandatedVault.Action(
                 BASE_USDC, 0, abi.encodeCall(IERC20.approve, (BASE_COMPOUND_COMET, depositAmt))
             );
-            actions[1] = IERCXXXXMandatedVault.Action(
+            actions[1] = IERC8192MandatedVault.Action(
                 BASE_COMPOUND_COMET, 0, abi.encodeCall(ICometLike.supply, (BASE_USDC, depositAmt))
             );
 
@@ -120,8 +120,8 @@ contract VaultForkBaseUserStoriesTest is VaultForkBaseBase {
         assertGt(cometBal, 0, "Comet position should exist after supply");
 
         {
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+            actions[0] = IERC8192MandatedVault.Action(
                 BASE_COMPOUND_COMET, 0, abi.encodeCall(ICometLike.withdraw, (BASE_USDC, cometBal))
             );
 
@@ -174,11 +174,11 @@ contract VaultForkBaseUserStoriesTest is VaultForkBaseBase {
                 sqrtPriceLimitX96: 0
             });
 
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+            actions[0] = IERC8192MandatedVault.Action(
                 BASE_USDC, 0, abi.encodeCall(IERC20.approve, (BASE_UNISWAP_V3_ROUTER, depositAmt))
             );
-            actions[1] = IERCXXXXMandatedVault.Action(
+            actions[1] = IERC8192MandatedVault.Action(
                 BASE_UNISWAP_V3_ROUTER, 0, abi.encodeCall(IUniswapRouterLike.exactInputSingle, (swapParams))
             );
 
@@ -210,11 +210,11 @@ contract VaultForkBaseUserStoriesTest is VaultForkBaseBase {
                 sqrtPriceLimitX96: 0
             });
 
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+            actions[0] = IERC8192MandatedVault.Action(
                 BASE_WETH, 0, abi.encodeCall(IERC20.approve, (BASE_UNISWAP_V3_ROUTER, wethBalance))
             );
-            actions[1] = IERCXXXXMandatedVault.Action(
+            actions[1] = IERC8192MandatedVault.Action(
                 BASE_UNISWAP_V3_ROUTER, 0, abi.encodeCall(IUniswapRouterLike.exactInputSingle, (swapParams))
             );
 

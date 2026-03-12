@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: CC0-1.0
 pragma solidity ^0.8.24;
 
-/// @title IERCXXXXMandatedVault
+/// @title IERC8192MandatedVault
 /// @notice Minimal interface for risk-constrained delegated strategy execution on ERC-4626 vaults.
-/// @dev "XXXX" is the draft ERC number placeholder. It will be replaced with the assigned number
-///      once the EIP editor assigns one. Deployed vaults will retain the draft identifier.
-///      Implementers MUST also implement IERC4626 and IERC165.
-interface IERCXXXXMandatedVault {
+/// @dev ERC-8192-compliant vaults MUST also implement IERC4626 and IERC165.
+interface IERC8192MandatedVault {
     /* is IERC4626, IERC165 */
     // --------- Structs ---------
 

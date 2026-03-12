@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC0-1.0
 pragma solidity ^0.8.24;
 
-import {IERCXXXXMandatedVault} from "../interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../interfaces/IERC8192MandatedVault.sol";
 
 /// @title DrawdownLib
 /// @notice Circuit breaker logic for single-execution and cumulative drawdown checks.
@@ -15,7 +15,7 @@ library DrawdownLib {
         if (preAssets != 0 && preAssets > postAssets) {
             uint256 loss = preAssets - postAssets;
             if (loss * 10_000 > preAssets * uint256(maxDrawdownBps)) {
-                revert IERCXXXXMandatedVault.DrawdownExceeded();
+                revert IERC8192MandatedVault.DrawdownExceeded();
             }
         }
     }
@@ -31,7 +31,7 @@ library DrawdownLib {
         if (preAssets > postAssets) {
             uint256 loss = preAssets - postAssets;
             if (loss > maxSingleAbsoluteLoss) {
-                revert IERCXXXXMandatedVault.AbsoluteLossExceeded();
+                revert IERC8192MandatedVault.AbsoluteLossExceeded();
             }
         }
     }
@@ -50,7 +50,7 @@ library DrawdownLib {
         if (epochAssets != 0 && epochAssets > postAssets) {
             uint256 cumulativeLoss = epochAssets - postAssets;
             if (cumulativeLoss * 10_000 > epochAssets * uint256(maxCumulativeDrawdownBps)) {
-                revert IERCXXXXMandatedVault.CumulativeDrawdownExceeded();
+                revert IERC8192MandatedVault.CumulativeDrawdownExceeded();
             }
         }
 

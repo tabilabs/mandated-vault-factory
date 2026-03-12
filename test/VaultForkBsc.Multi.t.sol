@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../src/interfaces/IERC8192MandatedVault.sol";
 import {VenusAdapter} from "../src/adapters/VenusAdapter.sol";
 import {PancakeSwapV3Adapter} from "../src/adapters/PancakeSwapV3Adapter.sol";
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
@@ -28,11 +28,11 @@ contract VaultForkBscMultiTest is VaultForkBscBase {
         {
             (bytes32 root, bytes32[] memory busdProof, bytes32[] memory adapterProof) =
                 _rootForPair(BSC_VENUS_BUSD_UNDERLYING, address(venusAdapter));
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+            actions[0] = IERC8192MandatedVault.Action(
                 BSC_VENUS_BUSD_UNDERLYING, 0, abi.encodeCall(IERC20.approve, (address(venusAdapter), half))
             );
-            actions[1] = IERCXXXXMandatedVault.Action(
+            actions[1] = IERC8192MandatedVault.Action(
                 address(venusAdapter), 0, abi.encodeCall(VenusAdapter.supply, (BSC_VBUSD, half))
             );
 
@@ -40,10 +40,10 @@ contract VaultForkBscMultiTest is VaultForkBscBase {
             proofs[0] = busdProof;
             proofs[1] = adapterProof;
 
-            IERCXXXXMandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
+            IERC8192MandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
             (bool ok, bytes memory ret) = _execRaw(v, m, actions, proofs);
             if (!ok) {
-                assertEq(_revertSelector(ret), IERCXXXXMandatedVault.ActionCallFailed.selector, "unexpected selector");
+                assertEq(_revertSelector(ret), IERC8192MandatedVault.ActionCallFailed.selector, "unexpected selector");
                 (uint256 idx, bytes memory reason) = _decodeActionCallFailed(ret);
                 assertEq(idx, 1, "unexpected failing action");
                 if (_isVenusProtocolUnavailable(reason)) {
@@ -69,11 +69,11 @@ contract VaultForkBscMultiTest is VaultForkBscBase {
         {
             (bytes32 root, bytes32[] memory busdProof, bytes32[] memory adapterProof) =
                 _rootForPair(BSC_VENUS_BUSD_UNDERLYING, address(pancakeAdapter));
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+            actions[0] = IERC8192MandatedVault.Action(
                 BSC_VENUS_BUSD_UNDERLYING, 0, abi.encodeCall(IERC20.approve, (address(pancakeAdapter), half))
             );
-            actions[1] = IERCXXXXMandatedVault.Action(
+            actions[1] = IERC8192MandatedVault.Action(
                 address(pancakeAdapter),
                 0,
                 abi.encodeCall(
@@ -86,10 +86,10 @@ contract VaultForkBscMultiTest is VaultForkBscBase {
             proofs[0] = busdProof;
             proofs[1] = adapterProof;
 
-            IERCXXXXMandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
+            IERC8192MandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
             (bool ok, bytes memory ret) = _execRaw(v, m, actions, proofs);
             if (!ok) {
-                assertEq(_revertSelector(ret), IERCXXXXMandatedVault.ActionCallFailed.selector, "unexpected selector");
+                assertEq(_revertSelector(ret), IERC8192MandatedVault.ActionCallFailed.selector, "unexpected selector");
                 (uint256 idx, bytes memory reason) = _decodeActionCallFailed(ret);
                 assertEq(idx, 1, "unexpected failing action");
                 if (_isPancakeProtocolUnavailable(reason)) {
@@ -136,11 +136,11 @@ contract VaultForkBscMultiTest is VaultForkBscBase {
         {
             (bytes32 root, bytes32[] memory vTokenProof, bytes32[] memory adapterProof) =
                 _rootForPair(vToken, address(venusAdapter));
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+            actions[0] = IERC8192MandatedVault.Action(
                 vToken, 0, abi.encodeCall(IERC20.approve, (address(venusAdapter), vTokenBal))
             );
-            actions[1] = IERCXXXXMandatedVault.Action(
+            actions[1] = IERC8192MandatedVault.Action(
                 address(venusAdapter), 0, abi.encodeCall(VenusAdapter.withdraw, (vToken, vTokenBal))
             );
 
@@ -148,10 +148,10 @@ contract VaultForkBscMultiTest is VaultForkBscBase {
             proofs[0] = vTokenProof;
             proofs[1] = adapterProof;
 
-            IERCXXXXMandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
+            IERC8192MandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
             (bool execOk, bytes memory ret) = _execRaw(v, m, actions, proofs);
             if (!execOk) {
-                assertEq(_revertSelector(ret), IERCXXXXMandatedVault.ActionCallFailed.selector, "unexpected selector");
+                assertEq(_revertSelector(ret), IERC8192MandatedVault.ActionCallFailed.selector, "unexpected selector");
                 (uint256 idx, bytes memory innerReason) = _decodeActionCallFailed(ret);
                 assertEq(idx, 1, "unexpected failing action");
                 if (_isVenusProtocolUnavailable(innerReason)) {
@@ -198,11 +198,11 @@ contract VaultForkBscMultiTest is VaultForkBscBase {
             (bytes32 root, bytes32[] memory underlyingProof, bytes32[] memory adapterProof) =
                 _rootForPair(underlyings[i], address(venusAdapter));
 
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+            actions[0] = IERC8192MandatedVault.Action(
                 underlyings[i], 0, abi.encodeCall(IERC20.approve, (address(venusAdapter), depositAmt))
             );
-            actions[1] = IERCXXXXMandatedVault.Action(
+            actions[1] = IERC8192MandatedVault.Action(
                 address(venusAdapter), 0, abi.encodeCall(VenusAdapter.supply, (vTokens[i], depositAmt))
             );
 
@@ -210,14 +210,14 @@ contract VaultForkBscMultiTest is VaultForkBscBase {
             proofs[0] = underlyingProof;
             proofs[1] = adapterProof;
 
-            IERCXXXXMandatedVault.Mandate memory m = _mandate(candidateVault, _nextNonce(), 10000, root);
+            IERC8192MandatedVault.Mandate memory m = _mandate(candidateVault, _nextNonce(), 10000, root);
             (bool execOk, bytes memory ret) = _execRaw(candidateVault, m, actions, proofs);
 
             if (execOk) {
                 return (true, candidateVault, underlyings[i], vTokens[i], candidateShares, bytes(""));
             }
 
-            assertEq(_revertSelector(ret), IERCXXXXMandatedVault.ActionCallFailed.selector, "unexpected selector");
+            assertEq(_revertSelector(ret), IERC8192MandatedVault.ActionCallFailed.selector, "unexpected selector");
             (uint256 idx, bytes memory innerReason) = _decodeActionCallFailed(ret);
             assertEq(idx, 1, "unexpected failing action");
             emit log_named_address("lifecycle supply failed underlying", underlyings[i]);

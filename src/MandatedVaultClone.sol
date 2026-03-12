@@ -17,10 +17,10 @@ import {MandateLib} from "./libs/MandateLib.sol";
 import {AdapterLib} from "./libs/AdapterLib.sol";
 import {DrawdownLib} from "./libs/DrawdownLib.sol";
 
-import {IERCXXXXMandatedVault} from "./interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "./interfaces/IERC8192MandatedVault.sol";
 
 /// @title MandatedVaultClone
-/// @notice ERC-1167 Clone-compatible implementation of the ERC-XXXX Mandated Execution vault.
+/// @notice ERC-1167 Clone-compatible implementation of the ERC-8192 Mandated Execution vault.
 /// @dev Adapted from the canonical MandatedVault reference implementation for the minimal
 ///      proxy (Clone) deployment pattern. Key differences from the reference:
 ///
@@ -40,7 +40,7 @@ contract MandatedVaultClone is
     ERC165Upgradeable,
     EIP712Upgradeable,
     ReentrancyGuard,
-    IERCXXXXMandatedVault
+    IERC8192MandatedVault
 {
     // --- Constants -----------------------------------------------------------
 
@@ -48,13 +48,10 @@ contract MandatedVaultClone is
     bytes4 internal constant _ERC1271_MAGICVALUE = 0x1626ba7e;
 
     /// @dev Extension identifier for the selector allowlist extension.
-    ///      "erc-xxxx" is the draft ERC number placeholder; it will be replaced with the assigned
-    ///      number once the EIP editor assigns one. This constant is intentionally frozen as-is
-    ///      for the draft phase. Deployed vaults will retain the draft identifier.
-    bytes4 internal constant _SELECTOR_ALLOWLIST_ID = bytes4(keccak256("erc-xxxx:selector-allowlist@v1"));
+    bytes4 internal constant _SELECTOR_ALLOWLIST_ID = bytes4(keccak256("erc-8192:selector-allowlist@v1"));
 
     /// @dev Extension identifier for the absolute single-loss limit extension.
-    bytes4 internal constant _ABSOLUTE_LOSS_LIMIT_ID = bytes4(keccak256("erc-xxxx:absolute-loss-limit@v1"));
+    bytes4 internal constant _ABSOLUTE_LOSS_LIMIT_ID = bytes4(keccak256("erc-8192:absolute-loss-limit@v1"));
 
     /// @dev EIP-712 typehash for the Mandate struct.
     bytes32 internal constant _MANDATE_TYPEHASH = keccak256(
@@ -138,63 +135,63 @@ contract MandatedVaultClone is
 
     // --- Views ---------------------------------------------------------------
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function mandateAuthority() public view returns (address) {
         return _authority;
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function authorityEpoch() external view returns (uint64) {
         return _authorityEpoch;
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function pendingAuthority() external view returns (address) {
         return _pendingAuthority;
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function isNonceUsed(address authority, uint256 nonce) external view returns (bool) {
         return _nonceUsed[authority][nonce];
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function nonceThreshold(address authority) external view returns (uint256) {
         return _nonceThreshold[authority];
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function isMandateRevoked(bytes32 mandateHash) external view returns (bool) {
         return _mandateRevoked[mandateHash];
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function epochStart() external view returns (uint48) {
         return _epochStart;
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function epochAssets() external view returns (uint256) {
         return _epochAssets;
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function supportsExtension(bytes4 id) public view returns (bool) {
         return _supportsExtension(id);
     }
 
-    /// @dev Reports ERC-165 interface support for IERCXXXXMandatedVault and IERC4626.
+    /// @dev Reports ERC-165 interface support for IERC8192MandatedVault and IERC4626.
     function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
-        return interfaceId == type(IERCXXXXMandatedVault).interfaceId || interfaceId == type(IERC4626).interfaceId
+        return interfaceId == type(IERC8192MandatedVault).interfaceId || interfaceId == type(IERC4626).interfaceId
             || super.supportsInterface(interfaceId);
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function hashActions(Action[] calldata actions) external pure returns (bytes32) {
         return keccak256(abi.encode(actions));
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function hashMandate(Mandate calldata mandate) public view returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(
@@ -215,14 +212,14 @@ contract MandatedVaultClone is
 
     // --- Authority management (2-step transfer) ------------------------------
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function proposeAuthority(address newAuthority) external {
         if (msg.sender != _authority) revert NotAuthority();
         _pendingAuthority = newAuthority;
         emit AuthorityProposed(_authority, newAuthority);
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function acceptAuthority() external {
         if (msg.sender != _pendingAuthority) revert NotAuthority();
         address prev = _authority;
@@ -236,7 +233,7 @@ contract MandatedVaultClone is
 
     // --- Epoch management ----------------------------------------------------
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function resetEpoch() external {
         if (msg.sender != _authority) revert NotAuthority();
         _epochAssets = totalAssets();
@@ -246,14 +243,14 @@ contract MandatedVaultClone is
 
     // --- Revocation ----------------------------------------------------------
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function invalidateNonce(uint256 nonce) external {
         if (msg.sender != _authority) revert NotAuthority();
         _nonceUsed[_authority][nonce] = true;
         emit NonceInvalidated(_authority, nonce);
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function invalidateNoncesBelow(uint256 threshold) external {
         if (msg.sender != _authority) revert NotAuthority();
         if (threshold <= _nonceThreshold[_authority]) revert ThresholdNotIncreased();
@@ -261,7 +258,7 @@ contract MandatedVaultClone is
         emit NoncesInvalidatedBelow(_authority, threshold);
     }
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function revokeMandate(bytes32 mandateHash) external {
         if (msg.sender != _authority) revert NotAuthority();
         _mandateRevoked[mandateHash] = true;
@@ -270,7 +267,7 @@ contract MandatedVaultClone is
 
     // --- Execution -----------------------------------------------------------
 
-    /// @inheritdoc IERCXXXXMandatedVault
+    /// @inheritdoc IERC8192MandatedVault
     function execute(
         Mandate calldata mandate,
         Action[] calldata actions,
@@ -293,7 +290,8 @@ contract MandatedVaultClone is
         _executeActions(actions);
 
         // -- Step 15-17: Post-state, circuit breaker & event ------------------
-        postAssets = _postExecution(mandate, preAssets, authority_, mandateHash_, actionsDigest_, maxSingleAbsoluteLoss_);
+        postAssets =
+            _postExecution(mandate, preAssets, authority_, mandateHash_, actionsDigest_, maxSingleAbsoluteLoss_);
     }
 
     /// @dev Validates mandate fields, signature, nonce, and payload binding
@@ -309,7 +307,10 @@ contract MandatedVaultClone is
         bytes calldata signature,
         bytes32[][] calldata adapterProofs,
         bytes calldata extensions
-    ) internal returns (address authority_, bytes32 mandateHash_, bytes32 actionsDigest_, uint256 maxSingleAbsoluteLoss_) {
+    )
+        internal
+        returns (address authority_, bytes32 mandateHash_, bytes32 actionsDigest_, uint256 maxSingleAbsoluteLoss_)
+    {
         // -- Steps 1-5a: Mandate field validation -----------------------------
         MandateLib.validateFields(
             mandate,

@@ -6,7 +6,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {VaultFactory} from "../src/VaultFactory.sol";
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
-import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../src/interfaces/IERC8192MandatedVault.sol";
 import {VenusAdapter} from "../src/adapters/VenusAdapter.sol";
 import {PancakeSwapV3Adapter} from "../src/adapters/PancakeSwapV3Adapter.sol";
 
@@ -93,8 +93,12 @@ abstract contract VaultForkBscBase is Test {
 
         // Public RPCs can fail when accessing historical state (e.g., "missing trie node").
         // Treat these infra failures as non-actionable for test semantics.
-        try this.assertBscContractsLive() {} catch {
-            vm.skip(true, "BSC fork infra failure: cannot read on-chain state (e.g., missing trie node). Use head mode or switch RPC.");
+        try this.assertBscContractsLive() {}
+        catch {
+            vm.skip(
+                true,
+                "BSC fork infra failure: cannot read on-chain state (e.g., missing trie node). Use head mode or switch RPC."
+            );
             return;
         }
 
@@ -135,7 +139,7 @@ abstract contract VaultForkBscBase is Test {
         );
     }
 
-    function _sign(MandatedVaultClone v, IERCXXXXMandatedVault.Mandate memory m) internal view returns (bytes memory) {
+    function _sign(MandatedVaultClone v, IERC8192MandatedVault.Mandate memory m) internal view returns (bytes memory) {
         (uint8 vv, bytes32 r, bytes32 s) = vm.sign(authorityKey, v.hashMandate(m));
         return abi.encodePacked(r, s, vv);
     }
@@ -147,9 +151,9 @@ abstract contract VaultForkBscBase is Test {
     function _mandate(MandatedVaultClone v, uint256 nonce, uint16 maxDrawdownBps, bytes32 adaptersRoot)
         internal
         view
-        returns (IERCXXXXMandatedVault.Mandate memory)
+        returns (IERC8192MandatedVault.Mandate memory)
     {
-        return IERCXXXXMandatedVault.Mandate({
+        return IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: nonce,
             deadline: 0,
@@ -164,8 +168,8 @@ abstract contract VaultForkBscBase is Test {
 
     function _exec(
         MandatedVaultClone v,
-        IERCXXXXMandatedVault.Mandate memory m,
-        IERCXXXXMandatedVault.Action[] memory actions,
+        IERC8192MandatedVault.Mandate memory m,
+        IERC8192MandatedVault.Action[] memory actions,
         bytes32[][] memory proofs
     ) internal returns (uint256 pre, uint256 post) {
         bytes memory sig = _sign(v, m);
@@ -175,8 +179,8 @@ abstract contract VaultForkBscBase is Test {
 
     function _execRaw(
         MandatedVaultClone v,
-        IERCXXXXMandatedVault.Mandate memory m,
-        IERCXXXXMandatedVault.Action[] memory actions,
+        IERC8192MandatedVault.Mandate memory m,
+        IERC8192MandatedVault.Action[] memory actions,
         bytes32[][] memory proofs
     ) internal returns (bool ok, bytes memory ret) {
         bytes memory sig = _sign(v, m);
@@ -197,7 +201,7 @@ abstract contract VaultForkBscBase is Test {
         pure
         returns (uint256 index, bytes memory reason)
     {
-        require(_revertSelector(revertData) == IERCXXXXMandatedVault.ActionCallFailed.selector, "not ActionCallFailed");
+        require(_revertSelector(revertData) == IERC8192MandatedVault.ActionCallFailed.selector, "not ActionCallFailed");
         return abi.decode(_slice(revertData, 4), (uint256, bytes));
     }
 

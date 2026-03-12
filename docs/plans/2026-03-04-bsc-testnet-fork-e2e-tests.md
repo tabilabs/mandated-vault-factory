@@ -22,7 +22,7 @@
 - Layer B targets already deployed on-chain contracts and focuses on deployment consistency plus a minimal smoke path rather than exhaustive protocol-path coverage.
 
 3. About `ActionCallFailed` wrapping
-- Reverts from external protocols or inside adapters are often wrapped by `MandatedVaultClone` as `IERCXXXXMandatedVault.ActionCallFailed(index, reason)`.
+- Reverts from external protocols or inside adapters are often wrapped by `MandatedVaultClone` as `IERC8192MandatedVault.ActionCallFailed(index, reason)`.
 - Tests must distinguish between vault-native validation failures (direct revert) and action-execution failures (`ActionCallFailed`).
 
 ---

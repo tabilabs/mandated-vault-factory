@@ -1,6 +1,6 @@
 # Mandated Vault Factory
 
-ERC-1167 Clone factory for deploying **ERC-XXXX Mandated Execution** vaults — risk-constrained delegated strategy execution on ERC-4626 vaults.
+ERC-1167 Clone factory for deploying **ERC-8192 Mandated Execution** vaults — risk-constrained delegated strategy execution on ERC-4626 vaults.
 
 ## Architecture
 
@@ -43,7 +43,7 @@ VaultFactory (immutable, ownerless)
 - Action failure return data is capped at 4 KiB to prevent gas griefing via oversized `returndata`
 - `execute()` value forwarding is disabled (`action.value` must be 0) to prevent ETH drain attacks
 - Maximum 32 actions, 16 extensions, 64-deep Merkle proofs per execution
-- Library-level errors (`MandateLib.TooManyActions`, `AdapterLib.SelectorNotAllowed`, etc.) are part of `MandatedVaultClone`'s ABI and should be decoded alongside `IERCXXXXMandatedVault` errors
+- Library-level errors (`MandateLib.TooManyActions`, `AdapterLib.SelectorNotAllowed`, etc.) are part of `MandatedVaultClone`'s ABI and should be decoded alongside `IERC8192MandatedVault` errors
 
 ## Quick Start
 

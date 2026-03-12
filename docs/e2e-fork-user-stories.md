@@ -502,7 +502,7 @@ actions[1] = Action(AAVE_POOL, 0, supply(USDC, amount, vault, 0))
    - selRoot = hashPair(selLeaf0, selLeaf1)
 2. Build Extension array:
    Extension({
-     id: bytes4(keccak256("erc-xxxx:selector-allowlist@v1")),
+     id: bytes4(keccak256("erc-8192:selector-allowlist@v1")),
      required: false,
      data: abi.encode(selRoot, selectorProofs)
    })

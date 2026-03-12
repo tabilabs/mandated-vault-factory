@@ -2,14 +2,14 @@
 pragma solidity ^0.8.24;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import {IERCXXXXMandatedVault} from "../interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../interfaces/IERC8192MandatedVault.sol";
 
 /// @title AdapterLib
 /// @notice Adapter allowlist and selector allowlist Merkle proof verification.
 /// @dev Extracted from MandatedVaultClone.execute() steps 12 and 12a.
 ///      Errors declared here (AdapterProofTooDeep, InvalidActionData,
 ///      SelectorNotAllowed, SelectorProofTooDeep) are part of MandatedVaultClone's
-///      public ABI — integrators should decode them alongside IERCXXXXMandatedVault
+///      public ABI — integrators should decode them alongside IERC8192MandatedVault
 ///      errors when handling execute() reverts.
 library AdapterLib {
     /// @dev Codehash of an empty account (no deployed code).
@@ -26,7 +26,7 @@ library AdapterLib {
     /// @param allowedAdaptersRoot The Merkle root of allowed (adapter, codehash) pairs.
     /// @param maxProofDepth     Maximum allowed proof depth (DoS mitigation).
     function validateAdapters(
-        IERCXXXXMandatedVault.Action[] calldata actions,
+        IERC8192MandatedVault.Action[] calldata actions,
         bytes32[][] calldata adapterProofs,
         bytes32 allowedAdaptersRoot,
         uint256 maxProofDepth
@@ -38,16 +38,16 @@ library AdapterLib {
 
             // Reject EOAs / precompiles / non-existent accounts
             if (codeHash == bytes32(0) || codeHash == EMPTY_CODEHASH) {
-                revert IERCXXXXMandatedVault.AdapterNotAllowed();
+                revert IERC8192MandatedVault.AdapterNotAllowed();
             }
-            if (actions[i].value != 0) revert IERCXXXXMandatedVault.NonZeroActionValue();
+            if (actions[i].value != 0) revert IERC8192MandatedVault.NonZeroActionValue();
             if (adapterProofs[i].length > maxProofDepth) {
                 revert AdapterProofTooDeep(i, adapterProofs[i].length);
             }
 
             bytes32 leaf = keccak256(abi.encode(adapter, codeHash));
             if (!MerkleProof.verifyCalldata(adapterProofs[i], allowedAdaptersRoot, leaf)) {
-                revert IERCXXXXMandatedVault.AdapterNotAllowed();
+                revert IERC8192MandatedVault.AdapterNotAllowed();
             }
             unchecked {
                 ++i;
@@ -61,13 +61,13 @@ library AdapterLib {
     /// @param proofs        Per-action Merkle proofs for the selector allowlist.
     /// @param maxProofDepth Maximum allowed proof depth.
     function enforceSelectorAllowlist(
-        IERCXXXXMandatedVault.Action[] calldata actions,
+        IERC8192MandatedVault.Action[] calldata actions,
         bytes32 root,
         bytes32[][] memory proofs,
         uint256 maxProofDepth
     ) internal pure {
         if (proofs.length != actions.length) {
-            revert IERCXXXXMandatedVault.InvalidExtensionsEncoding();
+            revert IERC8192MandatedVault.InvalidExtensionsEncoding();
         }
         for (uint256 i = 0; i < actions.length;) {
             if (proofs[i].length > maxProofDepth) {
