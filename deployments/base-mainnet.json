@@ -30,24 +30,39 @@
     "aave": {
       "source": "https://aave.com/docs/resources/addresses",
       "addressBook": "https://github.com/aave-dao/aave-address-book/blob/main/src/AaveV3Base.sol",
-      "status": "pending-onchain-verification"
+      "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
+      "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "weth": "0x4200000000000000000000000000000000000006",
+      "status": "official-address-verified"
     },
     "morpho": {
       "source": "https://docs.morpho.org/get-started/resources/addresses/",
-      "status": "pending-onchain-verification"
+      "singleton": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+      "status": "official-address-verified"
     },
     "uniswap": {
       "source": "https://docs.uniswap.org/contracts/v3/reference/deployments/base-deployments",
-      "status": "pending-onchain-verification"
+      "quoterV2": "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a",
+      "swapRouter02": "0x2626664c2603336E57B271c5C0b26F421741e481",
+      "v3Factory": "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+      "weth": "0x4200000000000000000000000000000000000006",
+      "status": "official-address-verified"
     },
     "aerodrome": {
-      "source": "https://aerodrome.limited/pages/security.html",
-      "status": "pending-onchain-verification"
+      "source": "https://github.com/aerodrome-finance/contracts",
+      "router": "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43",
+      "status": "official-address-verified"
     },
     "compound": {
       "source": "https://docs.compound.finance/",
       "deployments": "https://github.com/compound-finance/comet/tree/main/deployments",
-      "status": "pending-onchain-verification"
+      "comet": "0xb125E6687d4313864e53df431d5425969c15Eb2F",
+      "baseToken": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "status": "official-address-verified"
     }
+  },
+  "notes": {
+    "protocolAnchors": "verified-from-official-sources",
+    "projectDeployments": "pending-fill-after-base-mainnet-deploy"
   }
 }

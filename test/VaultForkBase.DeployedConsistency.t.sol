@@ -26,7 +26,12 @@ contract VaultForkBaseDeployedConsistencyTest is Test {
         }
     }
 
-    function test_baseFork_deployedConsistency_factory_top5Adapters() public view {
+    function test_baseFork_deployedConsistency_factory_top5Adapters() public {
+        if (!BaseDeploymentJson.isComplete(vm)) {
+            vm.skip(true, "base-mainnet deployment record incomplete: protocol anchors exist, project deployment not filled");
+            return;
+        }
+
         BaseDeploymentJson.Config memory cfg = BaseDeploymentJson.read(vm);
 
         assertGt(cfg.factory.code.length, 0, "factory code missing");

@@ -26,6 +26,32 @@ library BaseDeploymentJson {
         AdapterConfig compound;
     }
 
+    function isComplete(Vm vm) internal view returns (bool) {
+        string memory raw = vm.readFile(FILE_PATH);
+        return isCompleteRaw(raw);
+    }
+
+    function isCompleteRaw(string memory raw) internal view returns (bool) {
+        return !_isPlaceholder(raw.readStringOr(".factory", ""))
+            && !_isPlaceholder(raw.readStringOr(".factoryCodehash", ""))
+            && !_isPlaceholder(raw.readStringOr(".factoryLeaf", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapters.aave", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapters.morpho", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapters.uniswap", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapters.aerodrome", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapters.compound", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapterCodehashes.aave", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapterCodehashes.morpho", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapterCodehashes.uniswap", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapterCodehashes.aerodrome", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapterCodehashes.compound", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapterLeaves.aave", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapterLeaves.morpho", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapterLeaves.uniswap", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapterLeaves.aerodrome", ""))
+            && !_isPlaceholder(raw.readStringOr(".adapterLeaves.compound", ""));
+    }
+
     function read(Vm vm) internal view returns (Config memory cfg) {
         string memory raw = vm.readFile(FILE_PATH);
 

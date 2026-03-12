@@ -67,7 +67,9 @@ contract VaultForkBscCoreSemanticsTest is Test {
         noopAdapter = new CoreNoopAdapter();
     }
 
-    function test_bscFork_us01_factoryDeterministicPredict_withCreator_matchesCreate_andDifferentCreatorDiffers() public {
+    function test_bscFork_us01_factoryDeterministicPredict_withCreator_matchesCreate_andDifferentCreatorDiffers()
+        public
+    {
         bytes32 salt = keccak256("US01_SALT");
         address creatorA = address(0xCA01);
         address creatorB = address(0xCA02);
@@ -75,10 +77,8 @@ contract VaultForkBscCoreSemanticsTest is Test {
         string memory name = "Core Sem Vault";
         string memory symbol = "csv";
 
-        address predictedA =
-            factory.predictVaultAddress(creatorA, BSC_BUSD, name, symbol, authority, salt);
-        address predictedB =
-            factory.predictVaultAddress(creatorB, BSC_BUSD, name, symbol, authority, salt);
+        address predictedA = factory.predictVaultAddress(creatorA, BSC_BUSD, name, symbol, authority, salt);
+        address predictedB = factory.predictVaultAddress(creatorB, BSC_BUSD, name, symbol, authority, salt);
 
         assertTrue(predictedA != predictedB, "different creators should have different predictions");
 
@@ -99,12 +99,9 @@ contract VaultForkBscCoreSemanticsTest is Test {
             MerkleHelper.buildTree2(_leaf(address(noopAdapter)), _leaf(address(busyAdapter)));
 
         IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        actions[0] = IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
         actions[1] = IERCXXXXMandatedVault.Action(
-            address(busyAdapter),
-            0,
-            abi.encodeCall(CoreVaultBusyAdapter.reenterDeposit, (1, address(busyAdapter)))
+            address(busyAdapter), 0, abi.encodeCall(CoreVaultBusyAdapter.reenterDeposit, (1, address(busyAdapter)))
         );
 
         bytes32[][] memory proofs = new bytes32[][](2);
@@ -131,8 +128,7 @@ contract VaultForkBscCoreSemanticsTest is Test {
             MerkleHelper.buildTree2(_leaf(address(noopAdapter)), _leaf(address(busyAdapter)));
 
         IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        actions[0] = IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
         actions[1] = IERCXXXXMandatedVault.Action(
             address(busyAdapter),
             0,
@@ -161,8 +157,7 @@ contract VaultForkBscCoreSemanticsTest is Test {
         bytes32 root = _leaf(address(noopAdapter));
 
         IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        actions[0] = IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
@@ -184,8 +179,7 @@ contract VaultForkBscCoreSemanticsTest is Test {
         bytes32 root = _leaf(address(noopAdapter));
 
         IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        actions[0] = IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
@@ -206,12 +200,11 @@ contract VaultForkBscCoreSemanticsTest is Test {
         bytes32 root = _leaf(address(noopAdapter));
 
         IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        actions[0] = IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
-        // payloadDigest 必须绑定 actionsDigest。这里故意给错误摘要，触发 PayloadDigestMismatch。
+        // payloadDigest must bind to actionsDigest. Intentionally provide a wrong digest to trigger PayloadDigestMismatch.
         bytes32 wrongPayloadDigest = keccak256("US03C_WRONG_PAYLOAD_DIGEST");
         IERCXXXXMandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, wrongPayloadDigest);
         bytes memory sig = _sign(vault, m, authorityKey);
@@ -238,7 +231,7 @@ contract VaultForkBscCoreSemanticsTest is Test {
             vault,
             executor,
             _nextNonce(),
-            bytes32(uint256(1)), // 非零 root，避免触发 InvalidAdaptersRoot
+            bytes32(uint256(1)), // Non-zero root to avoid triggering InvalidAdaptersRoot.
             bytes32(0)
         );
         bytes memory sig = _sign(vault, m, authorityKey);
@@ -256,12 +249,11 @@ contract VaultForkBscCoreSemanticsTest is Test {
         CoreNoopAdapter allowedAdapter = new CoreNoopAdapter();
 
         IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(actualAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        actions[0] = IERCXXXXMandatedVault.Action(address(actualAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
-        // root 只允许 allowedAdapter，action 用 actualAdapter，leaf/proof 必然不匹配
+        // The root only allows allowedAdapter while the action uses actualAdapter, so the leaf/proof must mismatch.
         bytes32 root = _leaf(address(allowedAdapter));
         IERCXXXXMandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
         bytes memory sig = _sign(vault, m, authorityKey);
@@ -279,15 +271,13 @@ contract VaultForkBscCoreSemanticsTest is Test {
         CoreNoopAdapter adapterB = new CoreNoopAdapter();
         CoreNoopAdapter adapterC = new CoreNoopAdapter();
 
-        // 复用 buildTree3，构造三叶 allowlist
+        // Reuse buildTree3 to construct a three-leaf allowlist.
         (bytes32 root, bytes32[][] memory proofs3) =
             MerkleHelper.buildTree3(_leaf(address(adapterA)), _leaf(address(adapterB)), _leaf(address(adapterC)));
 
         IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
         actions[0] = IERCXXXXMandatedVault.Action({
-            adapter: address(adapterA),
-            value: 1,
-            data: abi.encodeCall(CoreNoopAdapter.nop, ())
+            adapter: address(adapterA), value: 1, data: abi.encodeCall(CoreNoopAdapter.nop, ())
         });
 
         bytes32[][] memory proofs = new bytes32[][](1);
