@@ -169,6 +169,8 @@ Files:
 
 - Shell wrapper:
   - `scripts/deploy-bsc-mainnet.sh`
+- Readiness gate:
+  - `scripts/check-bsc-mainnet-readiness.sh`
 - Deployment record template:
   - `deployments/bsc-mainnet.json`
 - Fork helpers:
@@ -218,6 +220,8 @@ bash scripts/deploy-bsc-mainnet.sh
 Mainnet fork validation:
 
 ```bash
+export BSC_MAINNET_RPC="https://bsc-dataseed.binance.org/"
+
 forge test --match-path test/VaultForkBscMainnet.ProtocolAnchors.t.sol \
   --fork-url "$BSC_MAINNET_RPC"
 
@@ -225,9 +229,17 @@ forge test --match-path test/VaultForkBscMainnet.DeployedConsistency.t.sol \
   --fork-url "$BSC_MAINNET_RPC"
 ```
 
+Single-command readiness gate:
+
+```bash
+export BSC_MAINNET_RPC="https://bsc-dataseed.binance.org/"
+bash scripts/check-bsc-mainnet-readiness.sh
+```
+
 Notes:
 
 - `scripts/deploy-bsc-mainnet.sh` does not broadcast unless `DEPLOY_BROADCAST=1` is set.
+- `scripts/check-bsc-mainnet-readiness.sh` forces `DEPLOY_BROADCAST=0` and never enters a broadcast path.
 - `deployments/bsc-mainnet.json` intentionally keeps project deployment fields as placeholders until a real broadcast happens.
 - Read the operator checklist in `docs/bsc-mainnet-deployment-runbook.md` before any real mainnet deployment.
 

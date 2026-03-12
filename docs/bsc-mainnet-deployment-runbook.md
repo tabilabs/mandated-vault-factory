@@ -81,6 +81,28 @@ Preflight passed. Re-run with DEPLOY_BROADCAST=1 to broadcast.
 
 ## Fork Validation Before Broadcast
 
+Fastest full gate:
+
+```bash
+export BSC_MAINNET_RPC="https://bsc-dataseed.binance.org/"
+bash scripts/check-bsc-mainnet-readiness.sh
+```
+
+This script:
+
+- forces `DEPLOY_BROADCAST=0`
+- runs wrapper preflight
+- runs `ProtocolAnchors`
+- runs `DeployedConsistency`
+- can be made strict with:
+
+```bash
+export REQUIRE_COMPLETE_DEPLOYMENT_RECORD=1
+bash scripts/check-bsc-mainnet-readiness.sh
+```
+
+Use `REQUIRE_COMPLETE_DEPLOYMENT_RECORD=1` only after a real mainnet deployment is expected to exist in `deployments/bsc-mainnet.json`.
+
 Run protocol anchor validation:
 
 ```bash
