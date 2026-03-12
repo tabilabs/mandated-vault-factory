@@ -8,6 +8,22 @@ This runbook is for the real `BSC mainnet` deployment path of:
 
 It assumes the codebase has already moved to the active `ERC-8192` line and that mainnet preparation has passed code review.
 
+## Current Live Deployment
+
+Mainnet deployment completed on `2026-03-12T07:22:10Z`.
+
+- `VaultFactory`: `0x6eFC613Ece5D95e4a7b69B4EddD332CeeCbb61c6`
+- `VenusAdapter`: `0xB81966a4E1348D29102a6D76f714Bb3bf17C507e`
+- `PancakeSwapV3Adapter`: `0xDEb8deAB9E7F9068DE84A20E75A2A5165a4F2f75`
+- `factory.implementation()`: `0x64b40cB0C5F63EfC15f4fDC9A7f272BA82414cca`
+- deployer: `0x634664a61906F7f1a2bD115BDdd4d596917Bda0C`
+
+Deployment transactions:
+
+- `VaultFactory`: `0x52ae84aeefbc9be6500640647b32416a362cabb2417ebca549f05e7a54647a0c`
+- `VenusAdapter`: `0xdbe0604d2a2937b33319e9f356a9f126c21b4d2a3ce7c1975c7cef9e51ed1cae`
+- `PancakeSwapV3Adapter`: `0xf1475dea00e5808625ad542c680262ebbe388cb816322efb22f1887bf0c002b2`
+
 ## Scope and Safety Model
 
 - Default mode is `preflight` only.
@@ -60,7 +76,9 @@ export VERIFIER_URL="https://api.bscscan.com/api"
 - Confirm signer mode is `account` or `ledger`; avoid private key mode unless absolutely necessary.
 - Confirm `BSC_MAINNET_RPC` resolves to `chainId=56`.
 - Confirm the Pancake router/factory/WBNB triplet is still correct.
-- Confirm `deployments/bsc-mainnet.json` still contains placeholders for project deployment fields before the first real broadcast.
+- Confirm `deployments/bsc-mainnet.json` matches the intended deployment state:
+  - before first real broadcast: placeholders are expected
+  - after a real broadcast: real addresses / codehashes / leaves must already be recorded
 - Confirm `BSCSCAN_API_KEY` is present if explorer verification is required during broadcast.
 
 ## Run Safe Preflight
@@ -101,7 +119,7 @@ export REQUIRE_COMPLETE_DEPLOYMENT_RECORD=1
 bash scripts/check-bsc-mainnet-readiness.sh
 ```
 
-Use `REQUIRE_COMPLETE_DEPLOYMENT_RECORD=1` only after a real mainnet deployment is expected to exist in `deployments/bsc-mainnet.json`.
+Use `REQUIRE_COMPLETE_DEPLOYMENT_RECORD=1` whenever you want to enforce that the artifact already reflects a real mainnet deployment.
 
 Run protocol anchor validation:
 
@@ -110,7 +128,7 @@ forge test --match-path test/VaultForkBscMainnet.ProtocolAnchors.t.sol \
   --fork-url "$BSC_MAINNET_RPC"
 ```
 
-If `deployments/bsc-mainnet.json` still contains placeholders, this is the expected state:
+Before the first real mainnet deploy, `deployments/bsc-mainnet.json` may still contain placeholders:
 
 ```bash
 forge test --match-path test/VaultForkBscMainnet.DeployedConsistency.t.sol \
@@ -153,6 +171,36 @@ forge test --match-path test/VaultForkBscMainnet.DeployedConsistency.t.sol \
 - Confirm deployed codehashes match the artifact.
 - Confirm deployed Merkle leaves match the artifact.
 - Record the final deployer address and deployment timestamp in operations tracking.
+
+Recommended strict gate:
+
+```bash
+export REQUIRE_COMPLETE_DEPLOYMENT_RECORD=1
+bash scripts/check-bsc-mainnet-readiness.sh
+```
+
+## Artifact Recovery After Successful Broadcast
+
+If on-chain broadcast succeeds but artifact writing fails, recover from broadcast output and chain reads instead of re-broadcasting.
+
+Minimum recovery data:
+
+- deployed `factory` and adapter addresses
+- each deployment transaction hash
+- `factory.implementation()`
+- on-chain `codehash` for factory and adapters
+- computed Merkle leaves `keccak256(abi.encode(address, codehash))`
+
+Useful commands:
+
+```bash
+cast tx 0x52ae84aeefbc9be6500640647b32416a362cabb2417ebca549f05e7a54647a0c --rpc-url "$BSC_MAINNET_RPC"
+cast call 0x6eFC613Ece5D95e4a7b69B4EddD332CeeCbb61c6 'implementation()(address)' --rpc-url "$BSC_MAINNET_RPC"
+cast codehash 0x6eFC613Ece5D95e4a7b69B4EddD332CeeCbb61c6 --rpc-url "$BSC_MAINNET_RPC"
+cast abi-encode 'f(address,bytes32)' 0x6eFC613Ece5D95e4a7b69B4EddD332CeeCbb61c6 <factory_codehash> | xargs -I{} cast keccak {}
+```
+
+Do not re-run `DEPLOY_BROADCAST=1 bash scripts/deploy-bsc-mainnet.sh` just because artifact recovery failed once. That would create a second, unrelated mainnet deployment.
 
 ## Failure Handling
 

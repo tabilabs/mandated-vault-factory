@@ -158,9 +158,23 @@ Adapter notes:
 - `scripts/deploy-bsc-testnet.sh` validates router compatibility via `factory()` and `WETH9()` static calls before broadcasting.
 - `scripts/deploy-bsc-testnet.sh` writes `deployments/bsc-testnet.json` atomically (tmp + `mv`) and validates JSON before replace.
 
-## BSC Mainnet Deployment Preparation (P0)
+## BSC Mainnet Deployment
 
-Mainnet deployment is intentionally split into two modes:
+The repository now contains the live `BSC mainnet` deployment record for the active `ERC-8192` line.
+
+Current deployed contracts:
+
+- `VaultFactory`: `0x6eFC613Ece5D95e4a7b69B4EddD332CeeCbb61c6`
+- `VenusAdapter`: `0xB81966a4E1348D29102a6D76f714Bb3bf17C507e`
+- `PancakeSwapV3Adapter`: `0xDEb8deAB9E7F9068DE84A20E75A2A5165a4F2f75`
+
+Deployment transactions:
+
+- `VaultFactory`: `0x52ae84aeefbc9be6500640647b32416a362cabb2417ebca549f05e7a54647a0c`
+- `VenusAdapter`: `0xdbe0604d2a2937b33319e9f356a9f126c21b4d2a3ce7c1975c7cef9e51ed1cae`
+- `PancakeSwapV3Adapter`: `0xf1475dea00e5808625ad542c680262ebbe388cb816322efb22f1887bf0c002b2`
+
+Operational model is still intentionally split into two modes:
 
 - `preflight`: default, read-only, safe for operator validation
 - `broadcast`: explicit opt-in via `DEPLOY_BROADCAST=1`
@@ -171,7 +185,7 @@ Files:
   - `scripts/deploy-bsc-mainnet.sh`
 - Readiness gate:
   - `scripts/check-bsc-mainnet-readiness.sh`
-- Deployment record template:
+- Deployment record:
   - `deployments/bsc-mainnet.json`
 - Fork helpers:
   - `test/helpers/BscMainnetDeploymentJson.sol`
@@ -188,7 +202,7 @@ Required environment:
 export BSC_MAINNET_RPC="https://bsc-dataseed.binance.org/"
 ```
 
-Recommended signer setup for real broadcast:
+Recommended signer setup for future mainnet broadcasts:
 
 ```bash
 export DEPLOY_SIGNER_MODE="account"
@@ -210,7 +224,7 @@ The preflight step checks:
 - Pancake router `WETH9()` matches the expected `WBNB`
 - signer / verifier / deployment file / target addresses are printed before any broadcast path is allowed
 
-Real broadcast shape:
+Future broadcast shape:
 
 ```bash
 export DEPLOY_BROADCAST=1
@@ -240,8 +254,18 @@ Notes:
 
 - `scripts/deploy-bsc-mainnet.sh` does not broadcast unless `DEPLOY_BROADCAST=1` is set.
 - `scripts/check-bsc-mainnet-readiness.sh` forces `DEPLOY_BROADCAST=0` and never enters a broadcast path.
-- `deployments/bsc-mainnet.json` intentionally keeps project deployment fields as placeholders until a real broadcast happens.
+- `deployments/bsc-mainnet.json` now contains the real deployed factory / adapter addresses, codehashes, and leaves from `2026-03-12`.
+- The current factory implementation is `0x64b40cB0C5F63EfC15f4fDC9A7f272BA82414cca`.
+- If artifact writing fails after a successful broadcast, recover from broadcast logs and on-chain codehashes; do not guess values by hand.
 - Read the operator checklist in `docs/bsc-mainnet-deployment-runbook.md` before any real mainnet deployment.
+
+Strict post-deploy gate:
+
+```bash
+export BSC_MAINNET_RPC="https://bsc-dataseed.binance.org/"
+export REQUIRE_COMPLETE_DEPLOYMENT_RECORD=1
+bash scripts/check-bsc-mainnet-readiness.sh
+```
 
 Fork test suites are split by intent:
 
