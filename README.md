@@ -92,7 +92,7 @@ The repository includes minimal deployment artifacts for BSC Testnet:
   - requires local `forge`, `cast`, and `jq`
 - Deployment record template:
   - `deployments/bsc-testnet.json`
-  - includes adapter `codehash` and Merkle `leaf` values for allowlist construction
+  - includes factory + adapter `codehash` and Merkle `leaf` values for allowlist construction
 
 Set required environment variables:
 
@@ -130,6 +130,13 @@ export DEPLOYER_DERIVATION_PATH="m/44'/60'/0'/0/0"
 Run deployment:
 
 ```bash
+export DEPLOY_BROADCAST=1
+bash scripts/deploy-bsc-testnet.sh
+```
+
+Safe preflight only:
+
+```bash
 bash scripts/deploy-bsc-testnet.sh
 ```
 
@@ -147,8 +154,82 @@ Adapter notes:
 
 - `PancakeSwapV3Adapter.swap(...)` uses router `exactInputSingle` with a `deadline` field.
 - Use a short deadline window (e.g. `block.timestamp + 60`) to avoid stale execution.
+- `scripts/deploy-bsc-testnet.sh` defaults to preflight-only and requires `DEPLOY_BROADCAST=1` for real broadcast.
 - `scripts/deploy-bsc-testnet.sh` validates router compatibility via `factory()` and `WETH9()` static calls before broadcasting.
 - `scripts/deploy-bsc-testnet.sh` writes `deployments/bsc-testnet.json` atomically (tmp + `mv`) and validates JSON before replace.
+
+## BSC Mainnet Deployment Preparation (P0)
+
+Mainnet deployment is intentionally split into two modes:
+
+- `preflight`: default, read-only, safe for operator validation
+- `broadcast`: explicit opt-in via `DEPLOY_BROADCAST=1`
+
+Files:
+
+- Shell wrapper:
+  - `scripts/deploy-bsc-mainnet.sh`
+- Deployment record template:
+  - `deployments/bsc-mainnet.json`
+- Fork helpers:
+  - `test/helpers/BscMainnetDeploymentJson.sol`
+  - `test/helpers/BscMainnetForkConstants.sol`
+- Fork validation suites:
+  - `test/VaultForkBscMainnet.ProtocolAnchors.t.sol`
+  - `test/VaultForkBscMainnet.DeployedConsistency.t.sol`
+- Operator guide:
+  - `docs/bsc-mainnet-deployment-runbook.md`
+
+Required environment:
+
+```bash
+export BSC_MAINNET_RPC="https://bsc-dataseed.binance.org/"
+```
+
+Recommended signer setup for real broadcast:
+
+```bash
+export DEPLOY_SIGNER_MODE="account"
+export DEPLOYER_ACCOUNT="bsc-mainnet-deployer"
+export DEPLOYER_PASSWORD_FILE="$HOME/.secrets/foundry-keystore.pass"
+export BSCSCAN_API_KEY="..."
+```
+
+Safe preflight only:
+
+```bash
+bash scripts/deploy-bsc-mainnet.sh
+```
+
+The preflight step checks:
+
+- RPC resolves to `chainId=56`
+- Pancake router `factory()` matches the expected V3 factory
+- Pancake router `WETH9()` matches the expected `WBNB`
+- signer / verifier / deployment file / target addresses are printed before any broadcast path is allowed
+
+Real broadcast shape:
+
+```bash
+export DEPLOY_BROADCAST=1
+bash scripts/deploy-bsc-mainnet.sh
+```
+
+Mainnet fork validation:
+
+```bash
+forge test --match-path test/VaultForkBscMainnet.ProtocolAnchors.t.sol \
+  --fork-url "$BSC_MAINNET_RPC"
+
+forge test --match-path test/VaultForkBscMainnet.DeployedConsistency.t.sol \
+  --fork-url "$BSC_MAINNET_RPC"
+```
+
+Notes:
+
+- `scripts/deploy-bsc-mainnet.sh` does not broadcast unless `DEPLOY_BROADCAST=1` is set.
+- `deployments/bsc-mainnet.json` intentionally keeps project deployment fields as placeholders until a real broadcast happens.
+- Read the operator checklist in `docs/bsc-mainnet-deployment-runbook.md` before any real mainnet deployment.
 
 Fork test suites are split by intent:
 

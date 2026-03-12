@@ -1,0 +1,48 @@
+{
+  "chainId": 56,
+  "network": "bsc-mainnet",
+  "snapshotDate": "2026-03-12",
+  "factory": "<fill-from-official-deployment>",
+  "factoryCodehash": "<fill-from-onchain-codehash>",
+  "factoryLeaf": "<fill-from-onchain-leaf>",
+  "adapters": {
+    "venus": "<fill-from-deployed-adapter>",
+    "pancakeswap": "<fill-from-deployed-adapter>"
+  },
+  "adapterCodehashes": {
+    "venus": "<fill-from-onchain-codehash>",
+    "pancakeswap": "<fill-from-onchain-codehash>"
+  },
+  "adapterLeaves": {
+    "venus": "<fill-from-onchain-leaf>",
+    "pancakeswap": "<fill-from-onchain-leaf>"
+  },
+  "protocols": {
+    "venus": {
+      "source": "https://docs-v4.venus.io/deployed-contracts/markets",
+      "comptroller": "0xfD36E2c2a6789Db23113685031d7F16329158384",
+      "vBUSD": "0x95c78222B3D6e262426483D42CfA53685A67Ab9D",
+      "vUSDT": "0xfD5840Cd36d94D7229439859C0112a4185BC0255",
+      "status": "official-address-verified"
+    },
+    "pancakeswap": {
+      "source": "https://developer.pancakeswap.finance/contracts/v3/addresses",
+      "swapRouterV3": "0x1b81D678ffb9C0263b24A97847620C99d213eB14",
+      "v3Factory": "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
+      "quoterV2": "0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997",
+      "status": "official-address-verified"
+    }
+  },
+  "tokens": {
+    "source": "https://docs-v4.venus.io/deployed-contracts/markets",
+    "BUSD": "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56",
+    "USDT": "0x55d398326f99059fF775485246999027B3197955",
+    "WBNB": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    "scopeStatus": "parity-candidate-not-launch-approved"
+  },
+  "notes": {
+    "protocolAnchors": "verified-from-official-sources",
+    "projectDeployments": "pending-fill-after-bsc-mainnet-deploy",
+    "launchScope": "human-review-required-for-token-and-protocol-scope"
+  }
+}

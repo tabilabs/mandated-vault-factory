@@ -6,7 +6,7 @@ import {VaultFactory} from "../src/VaultFactory.sol";
 
 contract DeployFactory is Script {
     function run() external returns (VaultFactory factory) {
-        uint256 expectedChainId = vm.envOr("EXPECTED_CHAIN_ID", uint256(97));
+        uint256 expectedChainId = vm.envUint("EXPECTED_CHAIN_ID");
         require(block.chainid == expectedChainId, "unexpected chain id");
 
         vm.startBroadcast();

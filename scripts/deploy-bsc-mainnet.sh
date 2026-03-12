@@ -14,7 +14,7 @@ require_cmd() {
 
 run_file_path() {
   local script_name="$1"
-  printf 'broadcast/%s/%s/run-latest.json\n' "$script_name" "$BSC_TESTNET_CHAIN_ID"
+  printf 'broadcast/%s/%s/run-latest.json\n' "$script_name" "$BSC_MAINNET_CHAIN_ID"
 }
 
 resolve_foundry_out_dir() {
@@ -210,7 +210,7 @@ extract_contract_address() {
     seen[$normalized]=1
 
     local actual_codehash
-    actual_codehash="$(cast codehash "$candidate" --rpc-url "$BSC_TESTNET_RPC")"
+    actual_codehash="$(cast codehash "$candidate" --rpc-url "$BSC_MAINNET_RPC")"
     if [[ "${actual_codehash,,}" == "$expected_codehash" ]]; then
       codehash_matches+=("$candidate")
     fi
@@ -258,7 +258,7 @@ assert_contract_deployed() {
   local contract_address="$1"
   local contract_label="$2"
   local code
-  code="$(cast code "$contract_address" --rpc-url "$BSC_TESTNET_RPC")"
+  code="$(cast code "$contract_address" --rpc-url "$BSC_MAINNET_RPC")"
   if [[ "$code" == "0x" ]]; then
     echo "$contract_label has no runtime code at $contract_address" >&2
     exit 1
@@ -268,7 +268,7 @@ assert_contract_deployed() {
 assert_factory_runtime_config() {
   local factory_address="$1"
   local implementation_address
-  implementation_address="$(cast call "$factory_address" "implementation()(address)" --rpc-url "$BSC_TESTNET_RPC")" || {
+  implementation_address="$(cast call "$factory_address" "implementation()(address)" --rpc-url "$BSC_MAINNET_RPC")" || {
     echo "Factory runtime validation failed: implementation() call failed on $factory_address" >&2
     exit 1
   }
@@ -282,7 +282,7 @@ assert_factory_runtime_config() {
 assert_pancake_adapter_runtime_config() {
   local adapter_address="$1"
   local runtime_router
-  runtime_router="$(cast call "$adapter_address" "router()(address)" --rpc-url "$BSC_TESTNET_RPC")" || {
+  runtime_router="$(cast call "$adapter_address" "router()(address)" --rpc-url "$BSC_MAINNET_RPC")" || {
     echo "Pancake adapter runtime validation failed: router() call failed on $adapter_address" >&2
     exit 1
   }
@@ -296,12 +296,12 @@ assert_router_compatibility() {
   local factory_from_router
   local wnative_from_router
 
-  factory_from_router="$(cast call "$PANCAKESWAP_V3_ROUTER" "factory()(address)" --rpc-url "$BSC_TESTNET_RPC")" || {
+  factory_from_router="$(cast call "$PANCAKESWAP_V3_ROUTER" "factory()(address)" --rpc-url "$BSC_MAINNET_RPC")" || {
     echo "Router validation failed: factory() call failed on $PANCAKESWAP_V3_ROUTER" >&2
     exit 1
   }
 
-  wnative_from_router="$(cast call "$PANCAKESWAP_V3_ROUTER" "WETH9()(address)" --rpc-url "$BSC_TESTNET_RPC")" || {
+  wnative_from_router="$(cast call "$PANCAKESWAP_V3_ROUTER" "WETH9()(address)" --rpc-url "$BSC_MAINNET_RPC")" || {
     echo "Router validation failed: WETH9() call failed on $PANCAKESWAP_V3_ROUTER" >&2
     exit 1
   }
@@ -323,9 +323,9 @@ print_preflight_summary() {
     verifier_mode="enabled"
   fi
 
-  echo "BSC Testnet deployment preflight"
-  echo "  rpc: $BSC_TESTNET_RPC"
-  echo "  chainId(expected/resolved): $BSC_TESTNET_CHAIN_ID / $CHAIN_ID_ON_RPC"
+  echo "BSC Mainnet deployment preflight"
+  echo "  rpc: $BSC_MAINNET_RPC"
+  echo "  chainId(expected/resolved): $BSC_MAINNET_CHAIN_ID / $CHAIN_ID_ON_RPC"
   echo "  deploy_broadcast: $DEPLOY_BROADCAST"
   echo "  signer_mode: $SIGNER_MODE_SUMMARY"
   echo "  verifier: $verifier_mode ($VERIFIER_URL)"
@@ -335,24 +335,107 @@ print_preflight_summary() {
   echo "  pancakeswap.wnative: $PANCAKESWAP_V3_WNATIVE"
 }
 
+write_deployment_record() {
+  local factory_address="$1"
+  local factory_codehash="$2"
+  local factory_leaf="$3"
+  local venus_adapter_address="$4"
+  local venus_adapter_codehash="$5"
+  local venus_adapter_leaf="$6"
+  local pancake_adapter_address="$7"
+  local pancake_adapter_codehash="$8"
+  local pancake_adapter_leaf="$9"
+  local deployer_address="${10}"
+  local snapshot_date="${11}"
+  local deployed_at="${12}"
+
+  mkdir -p deployments
+  local tmp_deployment_file
+  tmp_deployment_file="$(mktemp deployments/.bsc-mainnet.json.tmp.XXXXXX)"
+
+  cleanup_tmp_file() {
+    if [[ -f "${tmp_deployment_file:-}" ]]; then
+      rm -f "$tmp_deployment_file"
+    fi
+  }
+  trap cleanup_tmp_file EXIT
+
+  cat > "$tmp_deployment_file" <<JSON
+{
+  "chainId": ${BSC_MAINNET_CHAIN_ID},
+  "network": "bsc-mainnet",
+  "snapshotDate": "${snapshot_date}",
+  "factory": "${factory_address}",
+  "factoryCodehash": "${factory_codehash}",
+  "factoryLeaf": "${factory_leaf}",
+  "adapters": {
+    "venus": "${venus_adapter_address}",
+    "pancakeswap": "${pancake_adapter_address}"
+  },
+  "adapterCodehashes": {
+    "venus": "${venus_adapter_codehash}",
+    "pancakeswap": "${pancake_adapter_codehash}"
+  },
+  "adapterLeaves": {
+    "venus": "${venus_adapter_leaf}",
+    "pancakeswap": "${pancake_adapter_leaf}"
+  },
+  "protocols": {
+    "venus": {
+      "source": "https://docs-v4.venus.io/deployed-contracts/markets",
+      "comptroller": "0xfD36E2c2a6789Db23113685031d7F16329158384",
+      "vBUSD": "0x95c78222B3D6e262426483D42CfA53685A67Ab9D",
+      "vUSDT": "0xfD5840Cd36d94D7229439859C0112a4185BC0255",
+      "status": "official-address-verified"
+    },
+    "pancakeswap": {
+      "source": "https://developer.pancakeswap.finance/contracts/v3/addresses",
+      "swapRouterV3": "${PANCAKESWAP_V3_ROUTER}",
+      "v3Factory": "${PANCAKESWAP_V3_FACTORY}",
+      "quoterV2": "0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997",
+      "status": "official-address-verified"
+    }
+  },
+  "tokens": {
+    "source": "https://docs-v4.venus.io/deployed-contracts/markets",
+    "BUSD": "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56",
+    "USDT": "0x55d398326f99059fF775485246999027B3197955",
+    "WBNB": "${PANCAKESWAP_V3_WNATIVE}",
+    "scopeStatus": "parity-candidate-not-launch-approved"
+  },
+  "notes": {
+    "protocolAnchors": "verified-from-official-sources",
+    "projectDeployments": "recorded-from-live-broadcast",
+    "launchScope": "human-review-required-for-token-and-protocol-scope",
+    "deployer": "${deployer_address}",
+    "deployedAt": "${deployed_at}"
+  }
+}
+JSON
+
+  jq empty "$tmp_deployment_file" >/dev/null
+  mv "$tmp_deployment_file" "$DEPLOYMENT_FILE"
+  trap - EXIT
+}
+
 require_cmd forge
 require_cmd cast
 require_cmd jq
 require_cmd mktemp
 
-: "${BSC_TESTNET_RPC:?BSC_TESTNET_RPC is required}"
+: "${BSC_MAINNET_RPC:?BSC_MAINNET_RPC is required}"
 
-BSC_TESTNET_CHAIN_ID="${BSC_TESTNET_CHAIN_ID:-97}"
+BSC_MAINNET_CHAIN_ID="${BSC_MAINNET_CHAIN_ID:-56}"
 PANCAKESWAP_V3_ROUTER="${PANCAKESWAP_V3_ROUTER:-0x1b81D678ffb9C0263b24A97847620C99d213eB14}"
 PANCAKESWAP_V3_FACTORY="${PANCAKESWAP_V3_FACTORY:-0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865}"
-PANCAKESWAP_V3_WNATIVE="${PANCAKESWAP_V3_WNATIVE:-0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd}"
-VERIFIER_URL="https://api-testnet.bscscan.com/api"
+PANCAKESWAP_V3_WNATIVE="${PANCAKESWAP_V3_WNATIVE:-0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c}"
+VERIFIER_URL="${VERIFIER_URL:-https://api.bscscan.com/api}"
 FOUNDRY_OUT_DIR="${FOUNDRY_OUT_DIR:-$(resolve_foundry_out_dir)}"
-DEPLOYMENT_FILE="${DEPLOYMENT_FILE:-deployments/bsc-testnet.json}"
+DEPLOYMENT_FILE="${DEPLOYMENT_FILE:-deployments/bsc-mainnet.json}"
 
-CHAIN_ID_ON_RPC="$(cast chain-id --rpc-url "$BSC_TESTNET_RPC")"
-if [[ "$CHAIN_ID_ON_RPC" != "$BSC_TESTNET_CHAIN_ID" ]]; then
-  echo "Chain mismatch: expected $BSC_TESTNET_CHAIN_ID, got $CHAIN_ID_ON_RPC" >&2
+CHAIN_ID_ON_RPC="$(cast chain-id --rpc-url "$BSC_MAINNET_RPC")"
+if [[ "$CHAIN_ID_ON_RPC" != "$BSC_MAINNET_CHAIN_ID" ]]; then
+  echo "Chain mismatch: expected $BSC_MAINNET_CHAIN_ID, got $CHAIN_ID_ON_RPC" >&2
   exit 1
 fi
 
@@ -374,12 +457,12 @@ if [[ -n "${BSCSCAN_API_KEY:-}" ]]; then
   )
 fi
 
-export EXPECTED_CHAIN_ID="$BSC_TESTNET_CHAIN_ID"
+export EXPECTED_CHAIN_ID="$BSC_MAINNET_CHAIN_ID"
 export PANCAKESWAP_V3_ROUTER
 
-echo "Deploying VaultFactory to BSC Testnet (chainId=$BSC_TESTNET_CHAIN_ID)..."
+echo "Deploying VaultFactory to BSC Mainnet (chainId=$BSC_MAINNET_CHAIN_ID)..."
 forge script script/DeployFactory.s.sol:DeployFactory \
-  --rpc-url "$BSC_TESTNET_RPC" \
+  --rpc-url "$BSC_MAINNET_RPC" \
   "${SIGNER_ARGS[@]}" \
   --broadcast \
   "${VERIFY_ARGS[@]}"
@@ -387,12 +470,12 @@ forge script script/DeployFactory.s.sol:DeployFactory \
 FACTORY_ADDRESS="$(extract_contract_address "DeployFactory.s.sol" "VaultFactory" "VaultFactory.sol")"
 assert_contract_deployed "$FACTORY_ADDRESS" "VaultFactory"
 assert_factory_runtime_config "$FACTORY_ADDRESS"
-FACTORY_CODEHASH="$(cast codehash "$FACTORY_ADDRESS" --rpc-url "$BSC_TESTNET_RPC")"
+FACTORY_CODEHASH="$(cast codehash "$FACTORY_ADDRESS" --rpc-url "$BSC_MAINNET_RPC")"
 FACTORY_LEAF="$(cast abi-encode "f(address,bytes32)" "$FACTORY_ADDRESS" "$FACTORY_CODEHASH" | xargs -I{} cast keccak {})"
 
-echo "Deploying adapters to BSC Testnet..."
+echo "Deploying adapters to BSC Mainnet..."
 forge script script/DeployAdapters.s.sol:DeployAdapters \
-  --rpc-url "$BSC_TESTNET_RPC" \
+  --rpc-url "$BSC_MAINNET_RPC" \
   "${SIGNER_ARGS[@]}" \
   --broadcast \
   "${VERIFY_ARGS[@]}"
@@ -406,65 +489,26 @@ assert_contract_deployed "$PANCAKESWAP_ADAPTER_ADDRESS" "PancakeSwapV3Adapter"
 assert_pancake_adapter_runtime_config "$PANCAKESWAP_ADAPTER_ADDRESS"
 
 DEPLOYER_ADDRESS="$(extract_deployer_address "$(run_file_path "DeployAdapters.s.sol")")"
+SNAPSHOT_DATE="$(date -u +%F)"
 DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-VENUS_ADAPTER_CODEHASH="$(cast codehash "$VENUS_ADAPTER_ADDRESS" --rpc-url "$BSC_TESTNET_RPC")"
-PANCAKESWAP_ADAPTER_CODEHASH="$(cast codehash "$PANCAKESWAP_ADAPTER_ADDRESS" --rpc-url "$BSC_TESTNET_RPC")"
+VENUS_ADAPTER_CODEHASH="$(cast codehash "$VENUS_ADAPTER_ADDRESS" --rpc-url "$BSC_MAINNET_RPC")"
+PANCAKESWAP_ADAPTER_CODEHASH="$(cast codehash "$PANCAKESWAP_ADAPTER_ADDRESS" --rpc-url "$BSC_MAINNET_RPC")"
 VENUS_ADAPTER_LEAF="$(cast abi-encode "f(address,bytes32)" "$VENUS_ADAPTER_ADDRESS" "$VENUS_ADAPTER_CODEHASH" | xargs -I{} cast keccak {})"
 PANCAKESWAP_ADAPTER_LEAF="$(cast abi-encode "f(address,bytes32)" "$PANCAKESWAP_ADAPTER_ADDRESS" "$PANCAKESWAP_ADAPTER_CODEHASH" | xargs -I{} cast keccak {})"
 
-mkdir -p deployments
-TMP_DEPLOYMENT_FILE="$(mktemp deployments/.bsc-testnet.json.tmp.XXXXXX)"
-cleanup_tmp_file() {
-  if [[ -f "${TMP_DEPLOYMENT_FILE:-}" ]]; then
-    rm -f "$TMP_DEPLOYMENT_FILE"
-  fi
-}
-trap cleanup_tmp_file EXIT
-
-cat > "$TMP_DEPLOYMENT_FILE" <<JSON
-{
-  "chainId": ${BSC_TESTNET_CHAIN_ID},
-  "network": "bsc-testnet",
-  "factory": "${FACTORY_ADDRESS}",
-  "factoryCodehash": "${FACTORY_CODEHASH}",
-  "factoryLeaf": "${FACTORY_LEAF}",
-  "adapters": {
-    "venus": "${VENUS_ADAPTER_ADDRESS}",
-    "pancakeswap": "${PANCAKESWAP_ADAPTER_ADDRESS}"
-  },
-  "adapterCodehashes": {
-    "venus": "${VENUS_ADAPTER_CODEHASH}",
-    "pancakeswap": "${PANCAKESWAP_ADAPTER_CODEHASH}"
-  },
-  "adapterLeaves": {
-    "venus": "${VENUS_ADAPTER_LEAF}",
-    "pancakeswap": "${PANCAKESWAP_ADAPTER_LEAF}"
-  },
-  "protocols": {
-    "venus": {
-      "comptroller": "0x94d1820b2D1c7c7452A163983Dc888CEC546b77D",
-      "vBUSD": "0x08e0A5575De71037aE36AbfAfb516595fE68e5e4",
-      "vUSDT": "0xb7526572FFE56AB9D7489838Bf2E18e3323b441A"
-    },
-    "pancakeswap": {
-      "router": "${PANCAKESWAP_V3_ROUTER}",
-      "factory": "${PANCAKESWAP_V3_FACTORY}",
-      "wnative": "${PANCAKESWAP_V3_WNATIVE}"
-    }
-  },
-  "tokens": {
-    "BUSD": "0xeD24FC36d5Ee211Ea25A80239Fb8C4Cfd80f12Ee",
-    "USDT": "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd",
-    "WBNB": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
-  },
-  "deployedAt": "${DEPLOYED_AT}",
-  "deployer": "${DEPLOYER_ADDRESS}"
-}
-JSON
-
-jq empty "$TMP_DEPLOYMENT_FILE" >/dev/null
-mv "$TMP_DEPLOYMENT_FILE" "$DEPLOYMENT_FILE"
-trap - EXIT
+write_deployment_record \
+  "$FACTORY_ADDRESS" \
+  "$FACTORY_CODEHASH" \
+  "$FACTORY_LEAF" \
+  "$VENUS_ADAPTER_ADDRESS" \
+  "$VENUS_ADAPTER_CODEHASH" \
+  "$VENUS_ADAPTER_LEAF" \
+  "$PANCAKESWAP_ADAPTER_ADDRESS" \
+  "$PANCAKESWAP_ADAPTER_CODEHASH" \
+  "$PANCAKESWAP_ADAPTER_LEAF" \
+  "$DEPLOYER_ADDRESS" \
+  "$SNAPSHOT_DATE" \
+  "$DEPLOYED_AT"
 
 echo "Deployment complete"
 echo "Factory: $FACTORY_ADDRESS"
