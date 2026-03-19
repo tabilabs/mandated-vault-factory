@@ -59,6 +59,35 @@ def test_testnet_eoa_configuration_uses_bnb_testnet() -> None:
     assert config.wallet_mode == WalletMode.EOA
     assert config.chain_id == ChainId.BNB_TESTNET
     assert config.auth_signer_address is not None
+    assert config.api_base_url == "https://dev.predict.fun"
+
+
+def test_mainnet_defaults_to_mainnet_api_base_url() -> None:
+    config = PredictConfig.from_env(
+        {
+            **base_env(),
+            "PREDICT_ENV": "mainnet",
+            "PREDICT_API_KEY": "test-api-key",
+            "PREDICT_PRIVATE_KEY": EOA_PRIVATE_KEY,
+        }
+    )
+
+    assert config.api_base_url == "https://api.predict.fun"
+
+
+def test_mandated_transport_defaults_do_not_force_overlay_mode() -> None:
+    config = PredictConfig.from_env(
+        {
+            **base_env(),
+            "PREDICT_WALLET_MODE": "read-only",
+            "ERC_MANDATED_MCP_COMMAND": "erc-mandated-mcp",
+            "ERC_MANDATED_CONTRACT_VERSION": "v0.3.0-agent-contract",
+        }
+    )
+
+    assert config.wallet_mode == WalletMode.READ_ONLY
+    assert config.mandated_mcp_command == "erc-mandated-mcp"
+    assert config.mandated_contract_version == "v0.3.0-agent-contract"
 
 
 def test_predict_account_mode_requires_both_fields() -> None:
@@ -163,7 +192,9 @@ def test_predict_account_overlay_defaults_allowed_adapters_root() -> None:
         }
     )
 
-    assert config.mandated_allowed_adapters_root == MANDATED_ALLOWED_ADAPTERS_ROOT_DEFAULT
+    assert (
+        config.mandated_allowed_adapters_root == MANDATED_ALLOWED_ADAPTERS_ROOT_DEFAULT
+    )
 
 
 def test_predict_account_overlay_accepts_explicit_allowed_adapters_root() -> None:
@@ -227,9 +258,10 @@ def test_predict_account_overlay_defaults_executor_key_to_authority_key() -> Non
     assert config.wallet_mode == WalletMode.PREDICT_ACCOUNT
     assert config.mandated_authority_private_key_value == MANDATED_AUTHORITY_PRIVATE_KEY
     assert config.mandated_executor_private_key_value == MANDATED_AUTHORITY_PRIVATE_KEY
-    assert config.mandated_executor_address == Account.from_key(
-        MANDATED_AUTHORITY_PRIVATE_KEY
-    ).address
+    assert (
+        config.mandated_executor_address
+        == Account.from_key(MANDATED_AUTHORITY_PRIVATE_KEY).address
+    )
 
 
 def test_dedicated_mandated_executor_key_overrides_authority_fallback() -> None:
@@ -246,9 +278,10 @@ def test_dedicated_mandated_executor_key_overrides_authority_fallback() -> None:
     assert config.wallet_mode == WalletMode.MANDATED_VAULT
     assert config.mandated_authority_private_key_value == MANDATED_AUTHORITY_PRIVATE_KEY
     assert config.mandated_executor_private_key_value == MANDATED_EXECUTOR_PRIVATE_KEY
-    assert config.mandated_executor_address == Account.from_key(
-        MANDATED_EXECUTOR_PRIVATE_KEY
-    ).address
+    assert (
+        config.mandated_executor_address
+        == Account.from_key(MANDATED_EXECUTOR_PRIVATE_KEY).address
+    )
 
 
 def test_explicit_mandated_vault_mode_uses_address_and_defaults() -> None:

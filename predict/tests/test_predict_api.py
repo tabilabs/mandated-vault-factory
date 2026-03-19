@@ -10,6 +10,8 @@ from lib.api import PredictApiClient, PredictApiError
 from lib.config import PredictConfig
 from lib.models import AuthRequest
 
+TESTNET_API_BASE_URL = "https://dev.predict.fun"
+
 
 def make_config(**overrides: str) -> PredictConfig:
     env = {
@@ -24,7 +26,7 @@ def make_config(**overrides: str) -> PredictConfig:
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_markets_uses_query_params_and_normalizes_response() -> None:
-    route = respx.get("https://api.predict.fun/v1/markets").mock(
+    route = respx.get(f"{TESTNET_API_BASE_URL}/v1/markets").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -48,7 +50,7 @@ async def test_get_markets_uses_query_params_and_normalizes_response() -> None:
 @pytest.mark.asyncio
 @respx.mock
 async def test_authenticated_requests_attach_bearer_token() -> None:
-    route = respx.get("https://api.predict.fun/v1/orders").mock(
+    route = respx.get(f"{TESTNET_API_BASE_URL}/v1/orders").mock(
         return_value=httpx.Response(
             200, json={"orders": [{"hash": "0xabc", "status": "OPEN"}]}
         )
@@ -69,8 +71,10 @@ async def test_authenticated_requests_attach_bearer_token() -> None:
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_jwt_accepts_nested_data_token_response() -> None:
-    respx.post("https://api.predict.fun/v1/auth").mock(
-        return_value=httpx.Response(200, json={"success": True, "data": {"token": "jwt-123"}})
+    respx.post(f"{TESTNET_API_BASE_URL}/v1/auth").mock(
+        return_value=httpx.Response(
+            200, json={"success": True, "data": {"token": "jwt-123"}}
+        )
     )
     client = PredictApiClient(make_config())
 
@@ -85,7 +89,7 @@ async def test_get_jwt_accepts_nested_data_token_response() -> None:
 @pytest.mark.asyncio
 @respx.mock
 async def test_transient_429_is_retried_before_success() -> None:
-    route = respx.get("https://api.predict.fun/v1/markets").mock(
+    route = respx.get(f"{TESTNET_API_BASE_URL}/v1/markets").mock(
         side_effect=[
             httpx.Response(429, json={"error": "slow down"}),
             httpx.Response(200, json={"markets": [{"id": "retry-market"}]}),
@@ -104,7 +108,7 @@ async def test_transient_429_is_retried_before_success() -> None:
 @respx.mock
 async def test_error_messages_redact_secrets() -> None:
     secret_key = "super-secret-api-key"
-    respx.post("https://api.predict.fun/v1/auth").mock(
+    respx.post(f"{TESTNET_API_BASE_URL}/v1/auth").mock(
         return_value=httpx.Response(500, text=f"boom {secret_key} Bearer jwt-abc123")
     )
     client = PredictApiClient(make_config(PREDICT_API_KEY=secret_key))
@@ -124,7 +128,7 @@ async def test_error_messages_redact_secrets() -> None:
 @pytest.mark.asyncio
 @respx.mock
 async def test_predict_api_error_exposes_status_code_for_http_failures() -> None:
-    respx.get("https://api.predict.fun/v1/markets/404/orderbook").mock(
+    respx.get(f"{TESTNET_API_BASE_URL}/v1/markets/404/orderbook").mock(
         return_value=httpx.Response(404, json={"error": "not_found"})
     )
     client = PredictApiClient(make_config())
@@ -140,8 +144,10 @@ async def test_predict_api_error_exposes_status_code_for_http_failures() -> None
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_create_order_wraps_payload_under_data_and_camelizes_order_fields() -> None:
-    route = respx.post("https://api.predict.fun/v1/orders").mock(
+async def test_create_order_wraps_payload_under_data_and_camelizes_order_fields() -> (
+    None
+):
+    route = respx.post(f"{TESTNET_API_BASE_URL}/v1/orders").mock(
         return_value=httpx.Response(
             200, json={"order": {"hash": "0xabc", "status": "OPEN"}}
         )
@@ -192,7 +198,7 @@ async def test_create_order_wraps_payload_under_data_and_camelizes_order_fields(
 @pytest.mark.asyncio
 @respx.mock
 async def test_create_order_normalizes_wrapped_data_payload() -> None:
-    route = respx.post("https://api.predict.fun/v1/orders").mock(
+    route = respx.post(f"{TESTNET_API_BASE_URL}/v1/orders").mock(
         return_value=httpx.Response(
             200, json={"order": {"hash": "0xabc", "status": "OPEN"}}
         )
@@ -234,10 +240,12 @@ async def test_create_order_normalizes_wrapped_data_payload() -> None:
 @pytest.mark.asyncio
 @respx.mock
 async def test_create_order_accepts_modern_order_hash_response_shape() -> None:
-    respx.post("https://api.predict.fun/v1/orders").mock(
+    respx.post(f"{TESTNET_API_BASE_URL}/v1/orders").mock(
         return_value=httpx.Response(
             200,
-            json={"data": {"code": "SUCCESS", "orderId": "ord_123", "orderHash": "0xabc"}},
+            json={
+                "data": {"code": "SUCCESS", "orderId": "ord_123", "orderHash": "0xabc"}
+            },
         )
     )
     client = PredictApiClient(
@@ -265,7 +273,7 @@ async def test_create_order_accepts_modern_order_hash_response_shape() -> None:
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_positions_accepts_modern_nested_response_shape() -> None:
-    respx.get("https://api.predict.fun/v1/positions").mock(
+    respx.get(f"{TESTNET_API_BASE_URL}/v1/positions").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -300,7 +308,10 @@ async def test_get_positions_accepts_modern_nested_response_shape() -> None:
 
     assert positions[0].positionId == "pos_123"
     assert positions[0].marketId == 1489
-    assert positions[0].tokenId == "42983634955227024919103064840361627082824364074391962525086869643328802555347"
+    assert (
+        positions[0].tokenId
+        == "42983634955227024919103064840361627082824364074391962525086869643328802555347"
+    )
     assert positions[0].outcomeName == "Yes"
     assert positions[0].quantity == "69999440000000000000"
     assert positions[0].status == "OPEN"
