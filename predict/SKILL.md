@@ -205,7 +205,7 @@ cd {baseDir} && uv run python scripts/predictclaw.py hedge analyze 101 202 --jso
 | `PREDICT_STORAGE_DIR` | Local journal and position storage |
 | `PREDICT_ENV` | Defaults to `testnet`; accepted values are `testnet`, `mainnet`, or `test-fixture` |
 | `PREDICT_WALLET_MODE` | Explicit mode override: `read-only`, `eoa`, `predict-account`, or `mandated-vault` |
-| `PREDICT_API_BASE_URL` | Optional REST base override |
+| `PREDICT_API_BASE_URL` | Optional REST base override; leave empty to use the env-specific default (`dev.predict.fun` for `testnet` / `test-fixture`, `api.predict.fun` for `mainnet`) |
 | `PREDICT_API_KEY` | Mainnet-authenticated predict.fun API access |
 | `PREDICT_PRIVATE_KEY` | EOA trading and funding path |
 | `PREDICT_ACCOUNT_ADDRESS` | Predict Account smart-wallet address |

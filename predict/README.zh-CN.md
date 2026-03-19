@@ -266,7 +266,7 @@ uv run python scripts/predictclaw.py hedge analyze 101 202 --json
 | `PREDICT_STORAGE_DIR` | 本地 journal 与持仓存储 |
 | `PREDICT_ENV` | 默认为 `testnet`；可选 `testnet`、`mainnet`、`test-fixture` |
 | `PREDICT_WALLET_MODE` | 显式模式覆盖：`read-only`、`eoa`、`predict-account`、`mandated-vault` |
-| `PREDICT_API_BASE_URL` | 可选 REST base override |
+| `PREDICT_API_BASE_URL` | 可选 REST base override；留空时按环境自动选择（`testnet` / `test-fixture` -> `dev.predict.fun`，`mainnet` -> `api.predict.fun`） |
 | `PREDICT_API_KEY` | mainnet 认证后的 predict.fun API 访问 |
 | `PREDICT_PRIVATE_KEY` | EOA 交易与资金路径 |
 | `PREDICT_ACCOUNT_ADDRESS` | Predict Account 智能钱包地址 |
