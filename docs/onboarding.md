@@ -64,8 +64,8 @@ uv run python scripts/predictclaw.py --help
 
 ## 7. PredictClaw Contributor Notes
 
-- The Python skill package lives in `predict/` and keeps its own `.venv`, tests, and `env.example`.
-- For packaged installs, copy `predict/env.example` to `~/.openclaw/skills/predictclaw/.env`; this is the recommended first-time config path.
+- The Python skill package lives in `predict/` and keeps its own `.venv`, tests, and `env.example` for source checkouts.
+- For packaged installs, create `~/.openclaw/skills/predictclaw/.env` and paste the mode-specific snippet from `predict/README.md`; this is the recommended first-time config path.
 - Use `PREDICT_ENV=test-fixture` for secret-free CLI and integration verification.
 - `predict/SKILL.md` is OpenClaw-facing install/use documentation; `predict/README.md` is repo-local contributor documentation.
 - Do not add public CLI verbs beyond the current command contract without updating tests, docs, and `scripts/predictclaw.py --help` together.
