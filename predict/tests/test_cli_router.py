@@ -134,6 +134,44 @@ def test_unknown_command_fails_cleanly() -> None:
     assert "Traceback" not in combined
 
 
+def test_local_env_loader_supports_quoted_values(tmp_path: Path) -> None:
+    predict_root = get_predict_root()
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        'PREDICT_PRIVATE_KEY="0xquoted-private-key"\n'
+        "OPENROUTER_API_KEY='sk-or-v1-quoted'\n",
+        encoding="utf-8",
+    )
+    command_env = os.environ.copy()
+    command_env["PREDICTCLAW_DISABLE_LOCAL_ENV"] = "1"
+    command_env["TEST_ENV_PATH"] = str(env_path)
+    command_env.pop("PREDICT_PRIVATE_KEY", None)
+    command_env.pop("OPENROUTER_API_KEY", None)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os\n"
+                "from pathlib import Path\n"
+                "from scripts.predictclaw import load_local_env\n"
+                'load_local_env(Path(os.environ["TEST_ENV_PATH"]))\n'
+                'print(os.environ["PREDICT_PRIVATE_KEY"])\n'
+                'print(os.environ["OPENROUTER_API_KEY"])\n'
+            ),
+        ],
+        cwd=predict_root,
+        env=command_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == ["0xquoted-private-key", "sk-or-v1-quoted"]
+
+
 def test_wallet_deposit_help_documents_funding_semantics() -> None:
     result = run_predictclaw("wallet", "deposit", "--help")
 

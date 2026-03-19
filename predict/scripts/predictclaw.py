@@ -24,6 +24,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dotenv import dotenv_values
+
 SKILL_DIR = Path(__file__).resolve().parent.parent
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -50,12 +52,10 @@ def load_local_env(env_path: Path) -> None:
     if not env_path.exists():
         return
 
-    for raw_line in env_path.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+    for key, value in dotenv_values(env_path).items():
+        if value is None:
             continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip())
+        os.environ.setdefault(key, value)
 
 
 if os.getenv("PREDICTCLAW_DISABLE_LOCAL_ENV") != "1":
