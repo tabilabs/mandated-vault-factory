@@ -13,6 +13,8 @@ if str(SKILL_DIR) not in sys.path:
     sys.path.insert(0, str(SKILL_DIR))
 
 from lib.config import ConfigError, PredictConfig
+from lib.api import PredictApiError
+from lib.mandated_mcp_bridge import MandatedVaultMcpError
 from lib.trade_service import TradeService
 
 
@@ -38,6 +40,29 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _emit_error(args: argparse.Namespace, error: Exception) -> int:
+    if args.json:
+        payload: dict[str, object] = {
+            "success": False,
+            "error": type(error).__name__,
+            "message": str(error),
+        }
+        status_code = getattr(error, "status_code", None)
+        method = getattr(error, "method", None)
+        path = getattr(error, "path", None)
+        if status_code is not None:
+            payload["statusCode"] = status_code
+        if method is not None:
+            payload["method"] = method
+        if path is not None:
+            payload["path"] = path
+        print(json.dumps(payload, indent=2))
+        return 1
+
+    print(str(error))
+    return 1
+
+
 async def _handle_buy(args: argparse.Namespace) -> int:
     try:
         result = await TradeService(PredictConfig.from_env()).buy(
@@ -48,9 +73,8 @@ async def _handle_buy(args: argparse.Namespace) -> int:
             slippage_bps=args.slippage_bps,
             expiration_minutes=args.expiration_minutes,
         )
-    except ConfigError as error:
-        print(str(error))
-        return 1
+    except (ConfigError, PredictApiError, MandatedVaultMcpError) as error:
+        return _emit_error(args, error)
 
     payload = result.to_dict()
     if args.json:

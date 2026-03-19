@@ -15,6 +15,7 @@ if str(SKILL_DIR) not in sys.path:
     sys.path.insert(0, str(SKILL_DIR))
 
 from lib.config import ConfigError, PredictConfig
+from lib.config import WalletMode, mandated_vault_v1_unsupported_error
 
 hedge_service_module = importlib.import_module("lib.hedge_service")
 HedgeService = getattr(hedge_service_module, "HedgeService")
@@ -51,12 +52,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _load_service() -> Any:
-    return HedgeService(PredictConfig.from_env())
+    config = PredictConfig.from_env()
+    if config.wallet_mode == WalletMode.MANDATED_VAULT:
+        raise mandated_vault_v1_unsupported_error("hedge")
+    return HedgeService(config)
 
 
 async def _handle_scan(args: argparse.Namespace) -> int:
     try:
-        portfolios = await _load_service().scan(
+        service = _load_service()
+        portfolios = await service.scan(
             query=args.query,
             limit=args.limit,
             min_coverage=args.min_coverage,
@@ -89,7 +94,8 @@ async def _handle_scan(args: argparse.Namespace) -> int:
 
 async def _handle_analyze(args: argparse.Namespace) -> int:
     try:
-        portfolios = await _load_service().analyze(
+        service = _load_service()
+        portfolios = await service.analyze(
             args.market_id_1, args.market_id_2, model=args.model
         )
     except ConfigError as error:

@@ -15,8 +15,11 @@ def _smoke_env_or_skip() -> dict[str, str]:
     missing = [name for name in required if not os.getenv(name)]
     if missing:
         pytest.skip(f"Smoke env not configured; missing: {', '.join(missing)}")
+    smoke_env = os.getenv("PREDICT_SMOKE_ENV", "testnet")
+    if smoke_env == "test-fixture":
+        pytest.skip("Smoke fixture mode is not supported by the live smoke API checks.")
     return {
-        "PREDICT_ENV": os.getenv("PREDICT_SMOKE_ENV", "testnet"),
+        "PREDICT_ENV": smoke_env,
         "PREDICT_STORAGE_DIR": os.getenv("PREDICT_STORAGE_DIR", "/tmp/predict-smoke"),
         "PREDICT_API_KEY": os.getenv("PREDICT_SMOKE_API_KEY", ""),
         "PREDICT_PRIVATE_KEY": os.getenv("PREDICT_SMOKE_PRIVATE_KEY", ""),
@@ -26,6 +29,13 @@ def _smoke_env_or_skip() -> dict[str, str]:
             "PREDICT_SMOKE_API_BASE_URL", "https://dev.predict.fun"
         ),
     }
+
+
+def test_smoke_env_helper_skips_fixture_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PREDICT_SMOKE_ENV", "test-fixture")
+
+    with pytest.raises(pytest.skip.Exception, match="fixture mode"):
+        _smoke_env_or_skip()
 
 
 @pytest.mark.asyncio

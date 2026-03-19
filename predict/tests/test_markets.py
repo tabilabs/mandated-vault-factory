@@ -6,6 +6,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+from lib.api import PredictApiError
+from lib.config import PredictConfig
+from lib.market_service import MarketService
+from lib.models import LastSaleRecord, MarketRecord, MarketStatsRecord, OrderBookRecord
+
 
 def run_predictclaw(
     *args: str, env: dict[str, str] | None = None
@@ -68,3 +75,72 @@ def test_search_no_matches_returns_user_safe_message() -> None:
     assert result.returncode == 0
     assert "No markets found" in result.stdout
     assert "Traceback" not in result.stdout + result.stderr
+
+
+class _MissingOrderbookClient:
+    async def get_markets(self, **_kwargs):
+        return [
+            MarketRecord(
+                id="1501",
+                title="Live-ish market",
+                question="Will fallback pricing still work?",
+                status="OPEN",
+                decimalPrecision=2,
+                volume24hUsd=123.0,
+            )
+        ]
+
+    async def get_market(self, market_id):
+        return MarketRecord(
+            id=str(market_id),
+            title="Live-ish market",
+            question="Will fallback pricing still work?",
+            status="OPEN",
+            decimalPrecision=2,
+            volume24hUsd=123.0,
+        )
+
+    async def get_market_stats(self, market_id):
+        return MarketStatsRecord(marketId=str(market_id), volume24hUsd=123.0)
+
+    async def get_market_last_sale(self, market_id):
+        return LastSaleRecord(marketId=str(market_id), price=0.73)
+
+    async def get_orderbook(self, market_id):
+        raise PredictApiError(
+            f"missing orderbook for {market_id}",
+            status_code=404,
+            method="GET",
+            path=f"/v1/orderbook/{market_id}",
+        )
+
+    async def close(self):
+        return None
+
+
+@pytest.mark.asyncio
+async def test_market_service_trending_tolerates_missing_orderbook() -> None:
+    service = MarketService(PredictConfig.from_env({"PREDICT_ENV": "testnet"}))
+    service._make_client = lambda: _MissingOrderbookClient()  # type: ignore[method-assign]
+
+    summaries = await service.get_trending(limit=1)
+
+    assert len(summaries) == 1
+    assert summaries[0].id == "1501"
+    assert summaries[0].yes_mark_price == 0.73
+    assert summaries[0].no_mark_price == 0.27
+
+
+@pytest.mark.asyncio
+async def test_market_service_detail_tolerates_missing_orderbook() -> None:
+    service = MarketService(PredictConfig.from_env({"PREDICT_ENV": "testnet"}))
+    service._make_client = lambda: _MissingOrderbookClient()  # type: ignore[method-assign]
+
+    detail = await service.get_detail("1501")
+
+    assert str(detail.market.id) == "1501"
+    assert detail.last_sale.price == 0.73
+    assert detail.orderbook.asks == []
+    assert detail.orderbook.bids == []
+    assert detail.yes_mark_price == 0.73
+    assert detail.no_mark_price == 0.27

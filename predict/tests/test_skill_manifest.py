@@ -42,6 +42,25 @@ def test_openclaw_install_examples_are_valid() -> None:
 
     assert "cd {baseDir} && uv sync" in body
     assert "manual install" in body.lower()
-    assert "predict account" in body.lower()
+    assert "read-only" in body.lower()
+    assert "eoa" in body.lower()
+    assert "predict-account" in body.lower()
+    assert "mandated-vault" in body.lower()
     assert "wallet deposit" in body
     assert "wallet withdraw" in body
+    assert "PREDICT_WALLET_MODE" in body
+    assert "ERC_MANDATED_VAULT_ADDRESS" in body
+    assert "ERC_MANDATED_FACTORY_ADDRESS" in body
+    assert "ERC_MANDATED_VAULT_ASSET_ADDRESS" in body
+    assert "ERC_MANDATED_VAULT_NAME" in body
+    assert "ERC_MANDATED_VAULT_SYMBOL" in body
+    assert "ERC_MANDATED_VAULT_AUTHORITY" in body
+    assert "ERC_MANDATED_VAULT_SALT" in body
+    assert "ERC_MANDATED_MCP_COMMAND" in body
+    assert "ERC_MANDATED_CONTRACT_VERSION" in body
+    assert "ERC_MANDATED_CHAIN_ID" in body
+    assert "manual-only" in body
+    assert "vault contract policy authorizes" in body.lower()
+    assert "unsupported-in-mandated-vault-v1" in body
+    assert "vault-to-predict-account" in body
+    assert "funding-required" in body

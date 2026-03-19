@@ -53,3 +53,25 @@ def test_hedge_scan_fixture_limit_json() -> None:
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert len(payload) >= 1
+
+
+def test_hedge_cli_mandated_vault_blocks_scan_and_analyze_without_traceback() -> None:
+    env = {
+        "PREDICT_ENV": "testnet",
+        "PREDICT_STORAGE_DIR": "/tmp/predict",
+        "PREDICT_WALLET_MODE": "mandated-vault",
+        "ERC_MANDATED_VAULT_ADDRESS": "0x2222222222222222222222222222222222222222",
+    }
+
+    scan_result = run_hedge("scan", "--json", env=env)
+    analyze_result = run_hedge("analyze", "101", "202", "--json", env=env)
+
+    assert scan_result.returncode == 1
+    assert analyze_result.returncode == 1
+
+    scan_combined = scan_result.stdout + scan_result.stderr
+    analyze_combined = analyze_result.stdout + analyze_result.stderr
+    assert "unsupported-in-mandated-vault-v1" in scan_combined
+    assert "unsupported-in-mandated-vault-v1" in analyze_combined
+    assert "Traceback" not in scan_combined
+    assert "Traceback" not in analyze_combined

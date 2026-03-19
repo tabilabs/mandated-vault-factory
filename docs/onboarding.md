@@ -65,6 +65,14 @@ uv run python scripts/predictclaw.py --help
 ## 7. PredictClaw Contributor Notes
 
 - The Python skill package lives in `predict/` and keeps its own `.venv`, tests, and `.env.example`.
+- For packaged installs, copy `predict/.env.example` to `~/.openclaw/skills/predictclaw/.env`; this is the recommended first-time config path.
 - Use `PREDICT_ENV=test-fixture` for secret-free CLI and integration verification.
 - `predict/SKILL.md` is OpenClaw-facing install/use documentation; `predict/README.md` is repo-local contributor documentation.
 - Do not add public CLI verbs beyond the current command contract without updating tests, docs, and `scripts/predictclaw.py --help` together.
+- PredictClaw supports four wallet modes: `read-only`, `eoa`, `predict-account`, and `mandated-vault`.
+- `mandated-vault` is an advanced explicit opt-in path. Set `PREDICT_WALLET_MODE=mandated-vault` only when you intentionally want MCP-assisted mandated-vault control-plane behavior.
+- The preferred advanced trading route is `PREDICT_WALLET_MODE=predict-account` plus `ERC_MANDATED_*` overlay so Vault funds the Predict Account through `vault-to-predict-account` planning while Predict Account remains the official trading account.
+- For mandated-vault targeting, use `ERC_MANDATED_VAULT_ADDRESS` when you already know the deployed vault address. Otherwise supply the full derivation tuple (`ERC_MANDATED_FACTORY_ADDRESS`, `ERC_MANDATED_VAULT_ASSET_ADDRESS`, `ERC_MANDATED_VAULT_NAME`, `ERC_MANDATED_VAULT_SYMBOL`, `ERC_MANDATED_VAULT_AUTHORITY`, `ERC_MANDATED_VAULT_SALT`) so `wallet status` / `wallet deposit` can work with the MCP-predicted vault address.
+- If the predicted vault is undeployed, `wallet deposit` returns create-vault preparation guidance only; PredictClaw does not auto-broadcast. The MCP orchestrates the preparation flow, while the vault contract policy remains the authorization root.
+- Overlay buy keeps the official Predict Account path when funded and otherwise returns deterministic `funding-required` guidance pointing to `wallet deposit --json`.
+- v1 limitation: pure mandated-vault does not provide predict.fun trading parity. `wallet approve`, `wallet withdraw`, `buy`, `positions`, `position`, `hedge scan`, and `hedge analyze` stay blocked with `unsupported-in-mandated-vault-v1`.

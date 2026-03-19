@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -66,6 +68,22 @@ async def test_authenticated_requests_attach_bearer_token() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_get_jwt_accepts_nested_data_token_response() -> None:
+    respx.post("https://api.predict.fun/v1/auth").mock(
+        return_value=httpx.Response(200, json={"success": True, "data": {"token": "jwt-123"}})
+    )
+    client = PredictApiClient(make_config())
+
+    response = await client.get_jwt(
+        AuthRequest(signer="0x123", message="msg", signature="0xsig")
+    )
+
+    assert response.token == "jwt-123"
+    await client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_transient_429_is_retried_before_success() -> None:
     route = respx.get("https://api.predict.fun/v1/markets").mock(
         side_effect=[
@@ -100,6 +118,192 @@ async def test_error_messages_redact_secrets() -> None:
     assert secret_key not in message
     assert "jwt-abc123" not in message
     assert "<redacted>" in message
+    await client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_predict_api_error_exposes_status_code_for_http_failures() -> None:
+    respx.get("https://api.predict.fun/v1/markets/404/orderbook").mock(
+        return_value=httpx.Response(404, json={"error": "not_found"})
+    )
+    client = PredictApiClient(make_config())
+
+    with pytest.raises(PredictApiError) as error:
+        await client.get_orderbook("404")
+
+    assert error.value.status_code == 404
+    assert error.value.method == "GET"
+    assert error.value.path == "/v1/markets/404/orderbook"
+    await client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_order_wraps_payload_under_data_and_camelizes_order_fields() -> None:
+    route = respx.post("https://api.predict.fun/v1/orders").mock(
+        return_value=httpx.Response(
+            200, json={"order": {"hash": "0xabc", "status": "OPEN"}}
+        )
+    )
+    client = PredictApiClient(
+        make_config(), jwt_provider=lambda: _return_token("jwt-123")
+    )
+
+    await client.create_order(
+        {
+            "order": {
+                "token_id": "1001",
+                "maker_amount": "25",
+                "taker_amount": "40",
+                "fee_rate_bps": "100",
+                "signature_type": 0,
+                "signature": "0xsig",
+                "hash": "0xhash",
+            },
+            "pricePerShare": "625000000000000000",
+            "strategy": "MARKET",
+            "slippageBps": 50,
+        }
+    )
+
+    assert route.called
+    request = route.calls.last.request
+    assert request.headers["Authorization"] == "Bearer jwt-123"
+    assert json.loads(request.content) == {
+        "data": {
+            "order": {
+                "tokenId": "1001",
+                "makerAmount": "25",
+                "takerAmount": "40",
+                "feeRateBps": "100",
+                "signatureType": 0,
+                "signature": "0xsig",
+                "hash": "0xhash",
+            },
+            "pricePerShare": "625000000000000000",
+            "strategy": "MARKET",
+            "slippageBps": 50,
+        }
+    }
+    await client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_order_normalizes_wrapped_data_payload() -> None:
+    route = respx.post("https://api.predict.fun/v1/orders").mock(
+        return_value=httpx.Response(
+            200, json={"order": {"hash": "0xabc", "status": "OPEN"}}
+        )
+    )
+    client = PredictApiClient(
+        make_config(), jwt_provider=lambda: _return_token("jwt-123")
+    )
+
+    await client.create_order(
+        {
+            "data": {
+                "order": {
+                    "token_id": "1001",
+                    "maker_amount": "25",
+                    "hash": "0xhash",
+                },
+                "price_per_share": "500000000000000000",
+                "strategy": "LIMIT",
+                "expiration_minutes": 60,
+            }
+        }
+    )
+
+    assert json.loads(route.calls.last.request.content) == {
+        "data": {
+            "order": {
+                "tokenId": "1001",
+                "makerAmount": "25",
+                "hash": "0xhash",
+            },
+            "pricePerShare": "500000000000000000",
+            "strategy": "LIMIT",
+            "expirationMinutes": 60,
+        }
+    }
+    await client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_order_accepts_modern_order_hash_response_shape() -> None:
+    respx.post("https://api.predict.fun/v1/orders").mock(
+        return_value=httpx.Response(
+            200,
+            json={"data": {"code": "SUCCESS", "orderId": "ord_123", "orderHash": "0xabc"}},
+        )
+    )
+    client = PredictApiClient(
+        make_config(), jwt_provider=lambda: _return_token("jwt-123")
+    )
+
+    response = await client.create_order(
+        {
+            "order": {
+                "token_id": "1001",
+                "maker_amount": "25",
+                "taker_amount": "40",
+                "fee_rate_bps": "100",
+                "signature": "0xsig",
+            },
+            "pricePerShare": "625000000000000000",
+            "strategy": "MARKET",
+        }
+    )
+
+    assert response.hash == "0xabc"
+    await client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_positions_accepts_modern_nested_response_shape() -> None:
+    respx.get("https://api.predict.fun/v1/positions").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "success": True,
+                "cursor": None,
+                "data": [
+                    {
+                        "id": "pos_123",
+                        "amount": "69999440000000000000",
+                        "averageBuyPriceUsd": "0.014",
+                        "market": {
+                            "id": 1489,
+                            "question": "Will the Los Angeles Clippers win the 2026 NBA Finals?",
+                            "tradingStatus": "OPEN",
+                        },
+                        "outcome": {
+                            "name": "Yes",
+                            "onChainId": "42983634955227024919103064840361627082824364074391962525086869643328802555347",
+                        },
+                        "pnlUsd": "-0.07",
+                        "valueUsd": "0.91",
+                    }
+                ],
+            },
+        )
+    )
+    client = PredictApiClient(
+        make_config(), jwt_provider=lambda: _return_token("jwt-123")
+    )
+
+    positions = await client.get_positions()
+
+    assert positions[0].positionId == "pos_123"
+    assert positions[0].marketId == 1489
+    assert positions[0].tokenId == "42983634955227024919103064840361627082824364074391962525086869643328802555347"
+    assert positions[0].outcomeName == "Yes"
+    assert positions[0].quantity == "69999440000000000000"
+    assert positions[0].status == "OPEN"
     await client.close()
 
 

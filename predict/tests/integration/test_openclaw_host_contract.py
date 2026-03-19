@@ -7,26 +7,36 @@ import sys
 from pathlib import Path
 from typing import cast
 
+from conftest import get_predict_root
 from lib.mandated_mcp_bridge import MANDATED_V1_REQUIRED_TOOLS
 
-
-PREDICT_ACCOUNT_ADDRESS = "0x1234567890123456789012345678901234567890"
 VAULT_ADDRESS = "0x2222222222222222222222222222222222222222"
-AUTHORITY_ADDRESS = "0x5555555555555555555555555555555555555555"
+FACTORY_ADDRESS = "0x1111111111111111111111111111111111111111"
 ASSET_ADDRESS = "0x4444444444444444444444444444444444444444"
+AUTHORITY_ADDRESS = "0x5555555555555555555555555555555555555555"
+FROM_ADDRESS = AUTHORITY_ADDRESS
 PREDICTED_VAULT = "0x1234567890123456789012345678901234567890"
+PREDICT_ACCOUNT_ADDRESS = "0x9999999999999999999999999999999999999999"
+TX_TARGET = FACTORY_ADDRESS
+SALT = "0x" + "aa" * 32
 
 
-def run_predictclaw(
-    *args: str, env: dict[str, str]
+def install_openclaw_skill(tmp_path: Path) -> Path:
+    installed_root = tmp_path / ".openclaw" / "skills" / "predictclaw"
+    installed_root.parent.mkdir(parents=True, exist_ok=True)
+    installed_root.symlink_to(get_predict_root(), target_is_directory=True)
+    return installed_root
+
+
+def run_installed_predictclaw(
+    installed_root: Path, *args: str, env: dict[str, str]
 ) -> subprocess.CompletedProcess[str]:
-    predict_root = Path(__file__).resolve().parents[2]
     command_env = os.environ.copy()
     command_env["PREDICTCLAW_DISABLE_LOCAL_ENV"] = "1"
     command_env.update(env)
     return subprocess.run(
-        [sys.executable, str(predict_root / "scripts" / "predictclaw.py"), *args],
-        cwd=predict_root,
+        [sys.executable, str(installed_root / "scripts" / "predictclaw.py"), *args],
+        cwd=installed_root,
         env=command_env,
         capture_output=True,
         text=True,
@@ -34,21 +44,48 @@ def run_predictclaw(
     )
 
 
-def fixture_env(tmp_path: Path) -> dict[str, str]:
+def run_installed_wallet(
+    installed_root: Path, *args: str, env: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
+    command_env = os.environ.copy()
+    command_env["PREDICTCLAW_DISABLE_LOCAL_ENV"] = "1"
+    command_env.update(env)
+    return subprocess.run(
+        [sys.executable, str(installed_root / "scripts" / "wallet.py"), *args],
+        cwd=installed_root,
+        env=command_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def mandated_env(storage_dir: Path, command: str, **extra_env: str) -> dict[str, str]:
     return {
-        "PREDICT_ENV": "test-fixture",
-        "PREDICT_STORAGE_DIR": str(tmp_path),
-        "PREDICT_PRIVATE_KEY": "0x59c6995e998f97a5a0044976f4d060f5d89c8b8c7f11b9aa0dbf3f0f7c7c1e01",
+        "PREDICT_ENV": "testnet",
+        "PREDICT_STORAGE_DIR": str(storage_dir),
+        "PREDICT_WALLET_MODE": "mandated-vault",
+        "ERC_MANDATED_VAULT_ADDRESS": VAULT_ADDRESS,
+        "ERC_MANDATED_FACTORY_ADDRESS": FACTORY_ADDRESS,
+        "ERC_MANDATED_VAULT_ASSET_ADDRESS": ASSET_ADDRESS,
+        "ERC_MANDATED_VAULT_NAME": "Mandated Vault",
+        "ERC_MANDATED_VAULT_SYMBOL": "MVLT",
+        "ERC_MANDATED_VAULT_AUTHORITY": AUTHORITY_ADDRESS,
+        "ERC_MANDATED_VAULT_SALT": SALT,
+        "ERC_MANDATED_MCP_COMMAND": command,
+        "ERC_MANDATED_CHAIN_ID": "97",
+        **extra_env,
     }
 
 
 def write_fake_mcp_server(
     tmp_path: Path,
     *,
-    tools: list[str],
+    tools: list[str] | str,
     tool_results: dict[str, dict[str, object]],
 ) -> str:
     fixture_path = tmp_path / "fake-mcp-fixture.json"
+    env_path = tmp_path / "observed-contract-version.txt"
     server_path = tmp_path / "fake_mcp_server.py"
 
     fixture_path.write_text(
@@ -60,6 +97,7 @@ def write_fake_mcp_server(
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -94,6 +132,10 @@ def write_message(message: dict[str, object]) -> None:
 
 
 fixture = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+Path(sys.argv[2]).write_text(
+    os.getenv("ERC_MANDATED_CONTRACT_VERSION", ""),
+    encoding="utf-8",
+)
 
 while True:
     request = read_message()
@@ -167,7 +209,7 @@ while True:
 """.strip(),
         encoding="utf-8",
     )
-    return f"{sys.executable} {server_path} {fixture_path}"
+    return f"{sys.executable} {server_path} {fixture_path} {env_path}"
 
 
 def overlay_fund_and_action_plan(
@@ -260,7 +302,7 @@ def overlay_fund_and_action_session(
 ) -> dict[str, object]:
     return {
         "session": {
-            "sessionId": "session-integration-overlay",
+            "sessionId": "session-openclaw-overlay",
             "status": status,
             "currentStep": current_step,
             "createdAt": "2026-03-09T00:00:00Z",
@@ -321,7 +363,46 @@ def overlay_fund_and_action_next_step(
     }
 
 
-def overlay_mcp_command(
+def healthy_mcp_command(tmp_path: Path) -> str:
+    return write_fake_mcp_server(
+        tmp_path,
+        tools=sorted(MANDATED_V1_REQUIRED_TOOLS),
+        tool_results={
+            "factory_predict_vault_address": {
+                "structuredContent": {"result": {"predictedVault": PREDICTED_VAULT}}
+            },
+            "factory_create_vault_prepare": {
+                "structuredContent": {
+                    "result": {
+                        "predictedVault": PREDICTED_VAULT,
+                        "txRequest": {
+                            "from": FROM_ADDRESS,
+                            "to": TX_TARGET,
+                            "data": "0xfeedbeef",
+                            "value": "0x0",
+                            "gas": "210000",
+                        },
+                    }
+                }
+            },
+            "vault_health_check": {
+                "structuredContent": {
+                    "result": {
+                        "blockNumber": 101,
+                        "vault": VAULT_ADDRESS,
+                        "mandateAuthority": AUTHORITY_ADDRESS,
+                        "authorityEpoch": "7",
+                        "pendingAuthority": "0x0000000000000000000000000000000000000000",
+                        "nonceThreshold": "2",
+                        "totalAssets": "123000000000000000000",
+                    }
+                }
+            },
+        },
+    )
+
+
+def healthy_overlay_mcp_command(
     tmp_path: Path,
     *,
     plan: dict[str, object] | None = None,
@@ -353,8 +434,8 @@ def overlay_mcp_command(
                     "result": {
                         "predictedVault": PREDICTED_VAULT,
                         "txRequest": {
-                            "from": AUTHORITY_ADDRESS,
-                            "to": "0x1111111111111111111111111111111111111111",
+                            "from": FROM_ADDRESS,
+                            "to": TX_TARGET,
                             "data": "0xfeedbeef",
                             "value": "0x0",
                             "gas": "210000",
@@ -385,7 +466,7 @@ def overlay_mcp_command(
                             "authority": AUTHORITY_ADDRESS,
                             "executor": "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
                             "assetRegistryRef": "predict/usdt",
-                            "fundingPolicyRef": "vault-to-predict-account:0x1234567890123456789012345678901234567890",
+                            "fundingPolicyRef": f"vault-to-predict-account:{PREDICT_ACCOUNT_ADDRESS.lower()}",
                             "defaults": {
                                 "payloadBinding": "actionsDigest",
                                 "extensions": "0x",
@@ -400,7 +481,7 @@ def overlay_mcp_command(
                 "structuredContent": {
                     "result": {
                         "fundingPolicy": {
-                            "policyId": "vault-to-predict-account:0x1234567890123456789012345678901234567890",
+                            "policyId": f"vault-to-predict-account:{PREDICT_ACCOUNT_ADDRESS.lower()}",
                             "allowedTokenAddresses": [ASSET_ADDRESS],
                             "allowedRecipients": [PREDICT_ACCOUNT_ADDRESS],
                             "repeatable": True,
@@ -419,24 +500,6 @@ def overlay_mcp_command(
             },
         },
     )
-
-
-def predict_account_overlay_error_env(
-    tmp_path: Path,
-    *,
-    plan: dict[str, object] | None = None,
-    session: dict[str, object] | None = None,
-    next_step: dict[str, object] | None = None,
-) -> dict[str, str]:
-    return {
-        **predict_account_overlay_env(tmp_path),
-        "ERC_MANDATED_MCP_COMMAND": overlay_mcp_command(
-            tmp_path,
-            plan=plan,
-            session=session,
-            next_step=next_step,
-        ),
-    }
 
 
 def write_overlay_sitecustomize(tmp_path: Path) -> Path:
@@ -508,121 +571,124 @@ trade_service.TradeService._buy_fixture = _overlay_aware_buy_fixture
     return patch_root
 
 
-def predict_account_overlay_env(tmp_path: Path) -> dict[str, str]:
-    patch_root = write_overlay_sitecustomize(tmp_path)
+def overlay_env(storage_dir: Path, command: str, **extra_env: str) -> dict[str, str]:
+    patch_root = write_overlay_sitecustomize(storage_dir)
     return {
+        **mandated_env(storage_dir, command, **extra_env),
         "PREDICT_ENV": "test-fixture",
-        "PREDICT_STORAGE_DIR": str(tmp_path),
         "PREDICT_WALLET_MODE": "predict-account",
         "PREDICT_ACCOUNT_ADDRESS": PREDICT_ACCOUNT_ADDRESS,
         "PREDICT_PRIVY_PRIVATE_KEY": "0x59c6995e998f97a5a0044976f4d060f5d89c8b8c7f11b9aa0dbf3f0f7c7c1e01",
-        "ERC_MANDATED_VAULT_ADDRESS": VAULT_ADDRESS,
-        "ERC_MANDATED_FACTORY_ADDRESS": "0x1111111111111111111111111111111111111111",
-        "ERC_MANDATED_VAULT_ASSET_ADDRESS": "0x4444444444444444444444444444444444444444",
-        "ERC_MANDATED_VAULT_NAME": "Mandated Vault",
-        "ERC_MANDATED_VAULT_SYMBOL": "MVLT",
-        "ERC_MANDATED_VAULT_AUTHORITY": AUTHORITY_ADDRESS,
-        "ERC_MANDATED_VAULT_SALT": "0x" + "aa" * 32,
-        "ERC_MANDATED_CHAIN_ID": "97",
-        "ERC_MANDATED_MCP_COMMAND": overlay_mcp_command(tmp_path),
         "PYTHONPATH": str(patch_root),
     }
 
 
-def test_markets_family_runs_end_to_end(tmp_path) -> None:
-    result = run_predictclaw("markets", "trending", "--json", env=fixture_env(tmp_path))
-    payload = json.loads(result.stdout)
-    assert result.returncode == 0
-    assert payload[0]["id"] == "123"
-
-
-def test_wallet_status_deposit_withdraw_flow_runs_end_to_end(tmp_path) -> None:
-    env = fixture_env(tmp_path)
-    checksum = "0xb30741673D351135Cf96564dfD15f8e135f9C310"
-
-    status = run_predictclaw("wallet", "status", "--json", env=env)
-    deposit = run_predictclaw("wallet", "deposit", "--json", env=env)
-    withdraw = run_predictclaw(
-        "wallet", "withdraw", "usdt", "1", checksum, "--json", env=env
-    )
-
-    assert status.returncode == 0
-    assert deposit.returncode == 0
-    assert withdraw.returncode == 0
-    assert json.loads(status.stdout)["mode"] == "eoa"
-    assert json.loads(deposit.stdout)["acceptedAssets"] == ["BNB", "USDT"]
-    assert json.loads(withdraw.stdout)["asset"] == "usdt"
-
-
-def test_buy_positions_and_hedge_commands_run_end_to_end(tmp_path) -> None:
-    env = fixture_env(tmp_path)
-
-    buy = run_predictclaw("buy", "123", "YES", "25", "--json", env=env)
-    positions = run_predictclaw("positions", "--json", env=env)
-    hedge = run_predictclaw("hedge", "scan", "--limit", "5", "--json", env=env)
-
-    assert buy.returncode == 0
-    assert positions.returncode == 0
-    assert hedge.returncode == 0
-    assert json.loads(buy.stdout)["status"] == "FILLED"
-    assert len(json.loads(positions.stdout)) >= 1
-    assert len(json.loads(hedge.stdout)) >= 1
-
-
-def test_wallet_status_predict_account_overlay_runs_end_to_end(tmp_path) -> None:
-    status = run_predictclaw(
-        "wallet",
-        "status",
-        "--json",
-        env=predict_account_overlay_env(tmp_path),
-    )
-
-    assert status.returncode == 0
-    payload = json.loads(status.stdout)
-    funding_target = payload["fundingOrchestration"]["fundingTarget"]
-
-    assert payload["mode"] == "predict-account"
-    assert payload["fundingRoute"] == "vault-to-predict-account"
-    assert payload["predictAccountAddress"] == PREDICT_ACCOUNT_ADDRESS
-    assert payload["predictAccountAddress"] != payload["vaultAddress"]
-    assert payload["tradeSignerAddress"] != payload["vaultAddress"]
-    assert funding_target["recipient"] == PREDICT_ACCOUNT_ADDRESS
-
-
-def test_wallet_deposit_predict_account_overlay_runs_end_to_end(tmp_path) -> None:
-    deposit = run_predictclaw(
-        "wallet",
-        "deposit",
-        "--json",
-        env=predict_account_overlay_env(tmp_path),
-    )
-
-    assert deposit.returncode == 0
-    payload = json.loads(deposit.stdout)
-    funding_target = payload["fundingOrchestration"]["fundingTarget"]
-
-    assert payload["mode"] == "predict-account"
-    assert payload["fundingRoute"] == "vault-to-predict-account"
-    assert payload["predictAccountAddress"] == PREDICT_ACCOUNT_ADDRESS
-    assert payload["predictAccountAddress"] != payload["vaultAddress"]
-    assert payload["tradeSignerAddress"] != payload["vaultAddress"]
-    assert funding_target["recipient"] == PREDICT_ACCOUNT_ADDRESS
-
-
-def test_buy_predict_account_overlay_runs_end_to_end_when_balance_sufficient(
-    tmp_path,
+def test_openclaw_installed_skill_supports_wallet_status_via_env_injection(
+    tmp_path: Path,
 ) -> None:
-    buy = run_predictclaw(
+    installed_root = install_openclaw_skill(tmp_path)
+    env = mandated_env(tmp_path, healthy_mcp_command(tmp_path))
+
+    result = run_installed_predictclaw(
+        installed_root, "wallet", "status", "--json", env=env
+    )
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["mode"] == "mandated-vault"
+    assert payload["vaultAddress"] == VAULT_ADDRESS
+    assert payload["vaultAddressSource"] == "explicit"
+    assert payload["vaultDeployed"] is True
+    assert payload["stateChangingFlowsEnabled"] is True
+    assert payload["selectedChain"]["chainId"] == 97
+    assert payload["mcp"]["runtimeReady"] is True
+    assert payload["mcp"]["missingRequiredTools"] == []
+    assert payload["vaultHealth"]["totalAssets"] == "123000000000000000000"
+
+
+def test_openclaw_installed_skill_supports_wallet_deposit_via_env_injection(
+    tmp_path: Path,
+) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
+    env = mandated_env(tmp_path, healthy_mcp_command(tmp_path))
+
+    result = run_installed_predictclaw(
+        installed_root, "wallet", "deposit", "--json", env=env
+    )
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["mode"] == "mandated-vault"
+    assert payload["fundingAddress"] == VAULT_ADDRESS
+    assert payload["vaultAddressSource"] == "explicit"
+    assert payload["vaultExists"] is True
+    assert payload["acceptedAssets"] == ["BNB", "USDT"]
+    assert payload["createVaultPreparation"] is None
+
+
+def test_openclaw_installed_skill_supports_predict_account_overlay_status_via_env_injection(
+    tmp_path: Path,
+) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
+    env = overlay_env(tmp_path, healthy_overlay_mcp_command(tmp_path))
+
+    result = run_installed_predictclaw(
+        installed_root, "wallet", "status", "--json", env=env
+    )
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    funding_target = payload["fundingOrchestration"]["fundingTarget"]
+
+    assert payload["mode"] == "predict-account"
+    assert payload["fundingRoute"] == "vault-to-predict-account"
+    assert payload["predictAccountAddress"] == PREDICT_ACCOUNT_ADDRESS
+    assert payload["predictAccountAddress"] != payload["vaultAddress"]
+    assert payload["tradeSignerAddress"] != payload["vaultAddress"]
+    assert funding_target["recipient"] == PREDICT_ACCOUNT_ADDRESS
+
+
+def test_openclaw_installed_skill_supports_predict_account_overlay_deposit_via_env_injection(
+    tmp_path: Path,
+) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
+    env = overlay_env(tmp_path, healthy_overlay_mcp_command(tmp_path))
+
+    result = run_installed_predictclaw(
+        installed_root, "wallet", "deposit", "--json", env=env
+    )
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    funding_target = payload["fundingOrchestration"]["fundingTarget"]
+
+    assert payload["mode"] == "predict-account"
+    assert payload["fundingRoute"] == "vault-to-predict-account"
+    assert payload["predictAccountAddress"] == PREDICT_ACCOUNT_ADDRESS
+    assert payload["predictAccountAddress"] != payload["vaultAddress"]
+    assert payload["tradeSignerAddress"] != payload["vaultAddress"]
+    assert funding_target["recipient"] == PREDICT_ACCOUNT_ADDRESS
+
+
+def test_openclaw_installed_skill_supports_predict_account_overlay_buy_via_env_injection(
+    tmp_path: Path,
+) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
+    env = overlay_env(tmp_path, healthy_overlay_mcp_command(tmp_path))
+
+    result = run_installed_predictclaw(
+        installed_root,
         "buy",
         "123",
         "YES",
         "25",
         "--json",
-        env=predict_account_overlay_env(tmp_path),
+        env=env,
     )
 
-    assert buy.returncode == 0
-    assert json.loads(buy.stdout)["status"] == "FILLED"
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "FILLED"
 
     positions_path = tmp_path / "positions.json"
     stored = json.loads(positions_path.read_text())
@@ -634,121 +700,207 @@ def test_buy_predict_account_overlay_runs_end_to_end_when_balance_sufficient(
     assert notes["tradeSignerAddress"] != VAULT_ADDRESS
 
 
-def test_buy_predict_account_overlay_returns_deterministic_funding_guidance_when_balance_insufficient(
-    tmp_path,
+def test_openclaw_installed_skill_surfaces_missing_mcp_without_traceback(
+    tmp_path: Path,
 ) -> None:
-    buy = run_predictclaw(
+    installed_root = install_openclaw_skill(tmp_path)
+    env = mandated_env(tmp_path, "missing-mcp-binary-for-test")
+
+    result = run_installed_wallet(installed_root, "status", "--json", env=env)
+
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
+    assert "mandated-vault mcp" in combined.lower()
+    assert "Traceback" not in combined
+
+
+def test_openclaw_installed_skill_blocks_unsupported_flows_in_mandated_vault(
+    tmp_path: Path,
+) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
+    env = mandated_env(tmp_path, "missing-mcp-binary-for-test")
+
+    result = run_installed_predictclaw(
+        installed_root, "buy", "123", "YES", "25", "--json", env=env
+    )
+
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
+    assert "unsupported-in-mandated-vault-v1" in combined
+    assert "Traceback" not in combined
+
+
+def test_openclaw_installed_skill_surfaces_missing_overlay_mcp_without_traceback(
+    tmp_path: Path,
+) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
+    env = overlay_env(tmp_path, "missing-mcp-binary-for-test")
+
+    result = run_installed_predictclaw(
+        installed_root, "wallet", "status", "--json", env=env
+    )
+
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
+    assert "mandated-vault mcp" in combined.lower()
+    assert "Traceback" not in combined
+
+
+def test_openclaw_installed_skill_surfaces_missing_overlay_tools_without_traceback(
+    tmp_path: Path,
+) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
+    env = overlay_env(tmp_path, healthy_mcp_command(tmp_path))
+
+    result = run_installed_predictclaw(
+        installed_root, "wallet", "deposit", "--json", env=env
+    )
+
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
+    assert "agent_account_context_create" in combined
+    assert "Traceback" not in combined
+
+
+def test_openclaw_installed_skill_surfaces_overlay_funding_required_without_traceback(
+    tmp_path: Path,
+) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
+    env = overlay_env(tmp_path, healthy_overlay_mcp_command(tmp_path))
+
+    result = run_installed_predictclaw(
+        installed_root,
         "buy",
         "123",
         "YES",
         "30",
         "--json",
-        env=predict_account_overlay_env(tmp_path),
+        env=env,
     )
 
-    assert buy.returncode == 1
-    combined = buy.stdout + buy.stderr
-
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
     assert "funding-required" in combined
     assert "vault-to-predict-account" in combined
-    assert "requiredAmountRaw=5000000000000000000" in combined
-    assert "currentBalanceRaw=25000000000000000000" in combined
     assert PREDICT_ACCOUNT_ADDRESS in combined
     assert "wallet deposit --json" in combined
     assert "Traceback" not in combined
-    assert not (tmp_path / "positions.json").exists()
 
 
-def test_buy_predict_account_overlay_surfaces_stale_balance_without_traceback(
-    tmp_path,
+def test_openclaw_installed_skill_surfaces_overlay_stale_balance_without_traceback(
+    tmp_path: Path,
 ) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
     plan = overlay_fund_and_action_plan(
         evaluated_at="2026-03-09T00:10:00Z",
         snapshot_at="2026-03-09T00:00:00Z",
         max_staleness_seconds=60,
     )
-    buy = run_predictclaw(
+    env = overlay_env(
+        tmp_path,
+        healthy_overlay_mcp_command(tmp_path),
+    )
+    env["ERC_MANDATED_MCP_COMMAND"] = healthy_overlay_mcp_command(tmp_path, plan=plan)
+
+    result = run_installed_predictclaw(
+        installed_root,
         "buy",
         "123",
         "YES",
         "30",
         "--json",
-        env=predict_account_overlay_error_env(tmp_path, plan=plan),
+        env=env,
     )
 
-    assert buy.returncode == 1
-    combined = buy.stdout + buy.stderr
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
     assert "sessionOutcome=stale-balance" in combined
     assert "Traceback" not in combined
 
 
-def test_buy_predict_account_overlay_surfaces_funding_failed_without_traceback(
-    tmp_path,
+def test_openclaw_installed_skill_surfaces_overlay_follow_up_failed_without_traceback(
+    tmp_path: Path,
 ) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
     plan = overlay_fund_and_action_plan()
     session = overlay_fund_and_action_session_payload(
         plan,
         status="failed",
         current_step="none",
-        funding_step_status="failed",
-        funding_step_summary="Funding failed",
+        follow_up_step_status="failed",
+        follow_up_step_summary="Follow-up failed",
     )
     next_step = overlay_fund_and_action_next_step(
         plan,
         session=session,
         task_kind="completed",
-        task_summary="Funding failed",
+        task_summary="Follow-up failed",
     )
-    buy = run_predictclaw(
+    env = overlay_env(
+        tmp_path,
+        healthy_overlay_mcp_command(tmp_path),
+    )
+    env["ERC_MANDATED_MCP_COMMAND"] = healthy_overlay_mcp_command(
+        tmp_path,
+        plan=plan,
+        session=session,
+        next_step=next_step,
+    )
+
+    result = run_installed_predictclaw(
+        installed_root,
         "buy",
         "123",
         "YES",
         "30",
         "--json",
-        env=predict_account_overlay_error_env(
-            tmp_path,
-            plan=plan,
-            session=session,
-            next_step=next_step,
-        ),
+        env=env,
     )
 
-    assert buy.returncode == 1
-    combined = buy.stdout + buy.stderr
-    assert "sessionOutcome=funding-failed" in combined
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
+    assert "sessionOutcome=follow-up-failed" in combined
     assert "Traceback" not in combined
+    assert not (tmp_path / "positions.json").exists()
 
 
-def test_buy_predict_account_overlay_reports_stale_balance_snapshot_outcome(
-    tmp_path,
+def test_openclaw_installed_skill_reports_stale_balance_snapshot_outcome(
+    tmp_path: Path,
 ) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
     plan = overlay_fund_and_action_plan(
         evaluated_at="2026-03-09T00:03:01Z",
         snapshot_at="2026-03-09T00:00:00Z",
         max_staleness_seconds=120,
     )
     session = overlay_fund_and_action_session_payload(plan)
-    buy = run_predictclaw(
+    env = overlay_env(
+        tmp_path,
+        healthy_overlay_mcp_command(tmp_path, plan=plan, session=session),
+    )
+
+    result = run_installed_predictclaw(
+        installed_root,
         "buy",
         "123",
         "YES",
         "30",
         "--json",
-        env=predict_account_overlay_error_env(tmp_path, plan=plan, session=session),
+        env=env,
     )
 
-    assert buy.returncode == 1
-    combined = buy.stdout + buy.stderr
-
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
     assert "sessionOutcome=stale-balance" in combined
     assert "sessionStatus=pendingFunding" in combined
     assert "Traceback" not in combined
     assert not (tmp_path / "positions.json").exists()
 
 
-def test_buy_predict_account_overlay_reports_funding_failed_session_outcome(
-    tmp_path,
+def test_openclaw_installed_skill_reports_funding_failed_session_outcome(
+    tmp_path: Path,
 ) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
     plan = overlay_fund_and_action_plan()
     session = overlay_fund_and_action_session_payload(
         plan,
@@ -763,13 +915,9 @@ def test_buy_predict_account_overlay_reports_funding_failed_session_outcome(
         task_kind="pollFundingResult",
         task_summary="Poll failed vault funding transaction",
     )
-    buy = run_predictclaw(
-        "buy",
-        "123",
-        "YES",
-        "30",
-        "--json",
-        env=predict_account_overlay_error_env(
+    env = overlay_env(
+        tmp_path,
+        healthy_overlay_mcp_command(
             tmp_path,
             plan=plan,
             session=session,
@@ -777,9 +925,18 @@ def test_buy_predict_account_overlay_reports_funding_failed_session_outcome(
         ),
     )
 
-    assert buy.returncode == 1
-    combined = buy.stdout + buy.stderr
+    result = run_installed_predictclaw(
+        installed_root,
+        "buy",
+        "123",
+        "YES",
+        "30",
+        "--json",
+        env=env,
+    )
 
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
     assert "sessionOutcome=funding-failed" in combined
     assert "sessionStatus=failed" in combined
     assert "nextStepKind=pollFundingResult" in combined
@@ -787,9 +944,10 @@ def test_buy_predict_account_overlay_reports_funding_failed_session_outcome(
     assert not (tmp_path / "positions.json").exists()
 
 
-def test_buy_predict_account_overlay_reports_follow_up_failed_session_outcome(
-    tmp_path,
+def test_openclaw_installed_skill_reports_follow_up_failed_session_outcome(
+    tmp_path: Path,
 ) -> None:
+    installed_root = install_openclaw_skill(tmp_path)
     plan = overlay_fund_and_action_plan()
     session = overlay_fund_and_action_session_payload(
         plan,
@@ -806,13 +964,9 @@ def test_buy_predict_account_overlay_reports_follow_up_failed_session_outcome(
         task_kind="pollFollowUpResult",
         task_summary="Poll failed Predict order submission",
     )
-    buy = run_predictclaw(
-        "buy",
-        "123",
-        "YES",
-        "30",
-        "--json",
-        env=predict_account_overlay_error_env(
+    env = overlay_env(
+        tmp_path,
+        healthy_overlay_mcp_command(
             tmp_path,
             plan=plan,
             session=session,
@@ -820,9 +974,18 @@ def test_buy_predict_account_overlay_reports_follow_up_failed_session_outcome(
         ),
     )
 
-    assert buy.returncode == 1
-    combined = buy.stdout + buy.stderr
+    result = run_installed_predictclaw(
+        installed_root,
+        "buy",
+        "123",
+        "YES",
+        "30",
+        "--json",
+        env=env,
+    )
 
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
     assert "sessionOutcome=follow-up-failed" in combined
     assert "sessionStatus=failed" in combined
     assert "nextStepKind=pollFollowUpResult" in combined

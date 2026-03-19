@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .api import PredictApiClient
+from .api import PredictApiClient, PredictApiError
 from .config import PredictConfig, RuntimeEnv
 from .fixture_api import FixturePredictApiClient
 from .models import LastSaleRecord, MarketRecord, MarketStatsRecord, OrderBookRecord
@@ -77,9 +77,9 @@ class MarketService:
         client = self._make_client()
         try:
             market = await client.get_market(market_id)
-            stats = await client.get_market_stats(market_id)
-            last_sale = await client.get_market_last_sale(market_id)
-            orderbook = await client.get_orderbook(market_id)
+            stats, last_sale, orderbook = await self._load_market_supporting_data(
+                client, market_id
+            )
             yes_mark, no_mark = derive_mark_prices(
                 orderbook=orderbook,
                 last_sale=last_sale,
@@ -108,9 +108,9 @@ class MarketService:
     ) -> list[MarketSummary]:
         summaries: list[MarketSummary] = []
         for market in markets:
-            stats = await client.get_market_stats(market.id)
-            last_sale = await client.get_market_last_sale(market.id)
-            orderbook = await client.get_orderbook(market.id)
+            stats, last_sale, orderbook = await self._load_market_supporting_data(
+                client, market.id
+            )
             yes_mark, no_mark = derive_mark_prices(
                 orderbook=orderbook,
                 last_sale=last_sale,
@@ -130,6 +130,52 @@ class MarketService:
                 )
             )
         return summaries
+
+    async def _load_market_supporting_data(
+        self,
+        client: FixturePredictApiClient | PredictApiClient,
+        market_id: str | int,
+    ) -> tuple[MarketStatsRecord, LastSaleRecord, OrderBookRecord]:
+        stats = await self._load_optional_market_stats(client, market_id)
+        last_sale = await self._load_optional_last_sale(client, market_id)
+        orderbook = await self._load_optional_orderbook(client, market_id)
+        return stats, last_sale, orderbook
+
+    async def _load_optional_market_stats(
+        self,
+        client: FixturePredictApiClient | PredictApiClient,
+        market_id: str | int,
+    ) -> MarketStatsRecord:
+        try:
+            return await client.get_market_stats(market_id)
+        except PredictApiError as error:
+            if error.status_code == 404:
+                return MarketStatsRecord(marketId=market_id)
+            raise
+
+    async def _load_optional_last_sale(
+        self,
+        client: FixturePredictApiClient | PredictApiClient,
+        market_id: str | int,
+    ) -> LastSaleRecord:
+        try:
+            return await client.get_market_last_sale(market_id)
+        except PredictApiError as error:
+            if error.status_code == 404:
+                return LastSaleRecord(marketId=market_id)
+            raise
+
+    async def _load_optional_orderbook(
+        self,
+        client: FixturePredictApiClient | PredictApiClient,
+        market_id: str | int,
+    ) -> OrderBookRecord:
+        try:
+            return await client.get_orderbook(market_id)
+        except PredictApiError as error:
+            if error.status_code == 404:
+                return OrderBookRecord(marketId=market_id, asks=[], bids=[])
+            raise
 
 
 def derive_mark_prices(

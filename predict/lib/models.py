@@ -33,7 +33,17 @@ class JwtResponse(PredictModel):
 
     @classmethod
     def from_api(cls, payload: dict[str, Any]) -> "JwtResponse":
-        token = payload.get("token") or payload.get("jwt") or payload.get("accessToken")
+        data = payload.get("data", {})
+        if not isinstance(data, dict):
+            data = {}
+        token = (
+            payload.get("token")
+            or payload.get("jwt")
+            or payload.get("accessToken")
+            or data.get("token")
+            or data.get("jwt")
+            or data.get("accessToken")
+        )
         if not isinstance(token, str) or not token.strip():
             raise ValueError("predict.fun auth response did not include a JWT token")
         return cls(token=token)
@@ -43,6 +53,7 @@ class OutcomeRecord(PredictModel):
     id: str | int | None = None
     name: str | None = None
     tokenId: str | None = None
+    onChainId: str | None = None
 
 
 class MarketRecord(PredictModel):

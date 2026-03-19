@@ -15,6 +15,7 @@ if str(SKILL_DIR) not in sys.path:
     sys.path.insert(0, str(SKILL_DIR))
 
 from lib.config import ConfigError, PredictConfig
+from lib.config import WalletMode, mandated_vault_v1_unsupported_error
 
 positions_service_module = importlib.import_module("lib.positions_service")
 PositionsService = getattr(positions_service_module, "PositionsService")
@@ -48,14 +49,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _load_service() -> Any:
-    service = PositionsService(PredictConfig.from_env())
+    config = PredictConfig.from_env()
+    if config.wallet_mode == WalletMode.MANDATED_VAULT:
+        raise mandated_vault_v1_unsupported_error("positions")
+
+    service = PositionsService(config)
     service.sync_fixture_positions()
     return service
 
 
 async def _handle_list(args: argparse.Namespace) -> int:
-    service = _load_service()
-    positions = await service.list_positions(include_all=args.all)
+    try:
+        service = _load_service()
+        positions = await service.list_positions(include_all=args.all)
+    except ConfigError as error:
+        print(str(error))
+        return 1
+
     if args.json:
         print(json.dumps([item.to_dict() for item in positions], indent=2))
         return 0
@@ -64,8 +74,8 @@ async def _handle_list(args: argparse.Namespace) -> int:
 
 
 async def _handle_show(args: argparse.Namespace) -> int:
-    service = _load_service()
     try:
+        service = _load_service()
         position = await service.get_position(args.position_id)
     except ConfigError as error:
         print(str(error))

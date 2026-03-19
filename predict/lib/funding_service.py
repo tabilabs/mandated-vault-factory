@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Protocol, cast
@@ -8,12 +9,23 @@ from predict_sdk._internal.contracts import make_contract
 from predict_sdk.abis import KERNEL_ABI
 from web3 import Web3
 
-from .config import ConfigError, PredictConfig
+from .config import (
+    ConfigError,
+    PredictConfig,
+    WalletMode,
+    mandated_vault_v1_unsupported_error,
+)
+from .mandated_mcp_bridge import MandatedVaultMcpBridge
 from .wallet_manager import (
     FixtureWalletSdk,
+    MandatedVaultBridgeProtocol,
     PredictSdkWallet,
     WalletSdkProtocol,
+    build_vault_to_predict_account_orchestration,
+    load_wallet_bnb_balance_wei,
+    load_wallet_usdt_balance_wei,
     make_wallet_sdk,
+    resolve_mandated_vault,
 )
 
 
@@ -30,9 +42,17 @@ class DepositDetails:
     accepted_assets: list[str]
     bnb_balance_wei: int
     usdt_balance_wei: int
+    vault_address_source: str | None = None
+    vault_exists: bool | None = None
+    create_vault_preparation: dict[str, object] | None = None
+    funding_route: str | None = None
+    predict_account_address: str | None = None
+    trade_signer_address: str | None = None
+    vault_address: str | None = None
+    funding_orchestration: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "mode": self.mode,
             "fundingAddress": self.funding_address,
             "signerAddress": self.signer_address,
@@ -41,6 +61,21 @@ class DepositDetails:
             "bnbBalanceWei": self.bnb_balance_wei,
             "usdtBalanceWei": self.usdt_balance_wei,
         }
+        if self.vault_address_source is not None:
+            payload["vaultAddressSource"] = self.vault_address_source
+        if self.vault_exists is not None:
+            payload["vaultExists"] = self.vault_exists
+        if self.vault_exists is not None:
+            payload["createVaultPreparation"] = self.create_vault_preparation
+        elif self.create_vault_preparation is not None:
+            payload["createVaultPreparation"] = self.create_vault_preparation
+        if self.funding_route is not None:
+            payload["fundingRoute"] = self.funding_route
+            payload["predictAccountAddress"] = self.predict_account_address
+            payload["tradeSignerAddress"] = self.trade_signer_address
+            payload["vaultAddress"] = self.vault_address
+            payload["fundingOrchestration"] = self.funding_orchestration
+        return payload
 
 
 @dataclass
@@ -83,12 +118,25 @@ class FundingService:
         config: PredictConfig,
         *,
         sdk_factory: Callable[[PredictConfig], TransferCapableWallet] = make_wallet_sdk,
+        bridge_factory: Callable[
+            [PredictConfig], MandatedVaultBridgeProtocol
+        ] = MandatedVaultMcpBridge,
     ) -> None:
         self._config = config
         self._sdk_factory = sdk_factory
+        self._bridge_factory = bridge_factory
 
     def get_deposit_details(self) -> DepositDetails:
+        if self._config.wallet_mode.value == "mandated-vault":
+            return self._get_mandated_deposit_details()
+
         sdk = self._require_sdk()
+        if (
+            self._config.wallet_mode == WalletMode.PREDICT_ACCOUNT
+            and self._config.has_mandated_config_input
+        ):
+            return self._get_predict_account_overlay_deposit_details(sdk)
+
         return DepositDetails(
             mode=str(getattr(sdk.mode, "value", sdk.mode)),
             funding_address=sdk.funding_address,
@@ -99,9 +147,102 @@ class FundingService:
             usdt_balance_wei=sdk.get_usdt_balance_wei(),
         )
 
+    def _get_predict_account_overlay_deposit_details(
+        self, sdk: TransferCapableWallet
+    ) -> DepositDetails:
+        bridge = self._bridge_factory(self._config)
+
+        async def _load_and_close() -> DepositDetails:
+            await bridge.connect()
+            try:
+                bnb_balance = await load_wallet_bnb_balance_wei(sdk)
+                usdt_balance = await load_wallet_usdt_balance_wei(sdk)
+                orchestration = await build_vault_to_predict_account_orchestration(
+                    self._config,
+                    bridge,
+                    predict_account_address=sdk.funding_address,
+                    trade_signer_address=sdk.signer_address,
+                    current_usdt_balance_wei=usdt_balance,
+                    wallet_sdk=sdk,
+                )
+                return DepositDetails(
+                    mode=str(getattr(sdk.mode, "value", sdk.mode)),
+                    funding_address=sdk.funding_address,
+                    signer_address=sdk.signer_address,
+                    chain=sdk.chain_name,
+                    accepted_assets=["BNB", "USDT"],
+                    bnb_balance_wei=bnb_balance,
+                    usdt_balance_wei=usdt_balance,
+                    vault_address_source=orchestration.vault_address_source,
+                    vault_exists=orchestration.vault_exists,
+                    funding_route=orchestration.funding_route,
+                    predict_account_address=orchestration.predict_account_address,
+                    trade_signer_address=orchestration.trade_signer_address,
+                    vault_address=orchestration.vault_address,
+                    funding_orchestration=orchestration.to_dict(),
+                )
+            finally:
+                await bridge.close()
+
+        return asyncio.run(_load_and_close())
+
+    def _get_mandated_deposit_details(self) -> DepositDetails:
+        bridge = self._bridge_factory(self._config)
+
+        async def _load_and_close() -> DepositDetails:
+            await bridge.connect()
+            try:
+                resolution = await resolve_mandated_vault(
+                    self._config,
+                    bridge,
+                    include_create_prepare=True,
+                )
+                preparation: dict[str, object] | None = None
+                if (
+                    not resolution.vault_deployed
+                    and resolution.create_vault_prepare is not None
+                ):
+                    tx = resolution.create_vault_prepare.txRequest
+                    preparation = {
+                        "predictedVault": resolution.create_vault_prepare.predictedVault,
+                        "txSummary": {
+                            "from": tx.from_address,
+                            "to": tx.to,
+                            "data": tx.data,
+                            "value": tx.value,
+                            "gas": tx.gas,
+                        },
+                        "broadcast": "manual-only",
+                    }
+
+                return DepositDetails(
+                    mode=self._config.wallet_mode.value,
+                    funding_address=resolution.vault_address,
+                    signer_address=self._config.mandated_vault_authority
+                    or "not-required",
+                    chain=(
+                        "BNB Mainnet"
+                        if self._config.env.value == "mainnet"
+                        else "BNB Testnet"
+                    ),
+                    accepted_assets=["BNB", "USDT"],
+                    bnb_balance_wei=0,
+                    usdt_balance_wei=0,
+                    vault_address_source=resolution.vault_address_source,
+                    vault_exists=resolution.vault_deployed,
+                    create_vault_preparation=preparation,
+                )
+            finally:
+                await bridge.close()
+
+        return asyncio.run(_load_and_close())
+
     def withdraw(
         self, asset: str, amount: str, destination: str, *, withdraw_all: bool = False
     ) -> WithdrawalResult:
+        if self._config.wallet_mode == WalletMode.MANDATED_VAULT:
+            raise mandated_vault_v1_unsupported_error("wallet withdraw")
+
         sdk = self._require_sdk()
         asset_key = asset.lower()
         if asset_key not in TOKEN_DECIMALS:

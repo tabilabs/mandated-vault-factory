@@ -58,7 +58,8 @@ def load_local_env(env_path: Path) -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
-load_local_env(SKILL_DIR / ".env")
+if os.getenv("PREDICTCLAW_DISABLE_LOCAL_ENV") != "1":
+    load_local_env(SKILL_DIR / ".env")
 
 
 def run_script(script_name: str, args: list[str]) -> int:
@@ -97,12 +98,40 @@ def print_help() -> None:
     print()
     print("Environment:")
     print("  PREDICT_ENV                 testnet, mainnet, or fixture-safe local mode")
+    print(
+        "  PREDICT_WALLET_MODE         explicit mode override: read-only, eoa, predict-account, or mandated-vault"
+    )
     print("  PREDICT_PRIVATE_KEY         EOA trading credential")
     print("  PREDICT_ACCOUNT_ADDRESS     Predict Account smart-wallet address")
     print(
         "  PREDICT_PRIVY_PRIVATE_KEY   Privy-exported signer for Predict Account mode"
     )
     print("  PREDICT_API_KEY             mainnet-only authenticated REST access")
+    print("  ERC_MANDATED_VAULT_ADDRESS  Explicit deployed mandated vault address")
+    print(
+        "  ERC_MANDATED_FACTORY_ADDRESS Full derivation input for predicted vault lookup"
+    )
+    print(
+        "  ERC_MANDATED_VAULT_ASSET_ADDRESS ERC-4626 asset for predicted vault lookup"
+    )
+    print("  ERC_MANDATED_VAULT_NAME     Vault name for predicted vault lookup")
+    print("  ERC_MANDATED_VAULT_SYMBOL   Vault symbol for predicted vault lookup")
+    print("  ERC_MANDATED_VAULT_AUTHORITY Authority / create-vault preparer address")
+    print("  ERC_MANDATED_VAULT_SALT     Deterministic salt for predicted vault lookup")
+    print(
+        "  ERC_MANDATED_MCP_COMMAND    MCP launcher for vault overlay / mandated-vault mode"
+    )
+    print("  ERC_MANDATED_CONTRACT_VERSION Contract version passed to the MCP")
+    print("  ERC_MANDATED_CHAIN_ID       Optional explicit chain selection for the MCP")
+    print(
+        "  ERC_MANDATED_FUNDING_MAX_AMOUNT_PER_TX Optional Vault->Predict per-tx cap in raw token units"
+    )
+    print(
+        "  ERC_MANDATED_FUNDING_MAX_AMOUNT_PER_WINDOW Optional Vault->Predict window cap in raw token units"
+    )
+    print(
+        "  ERC_MANDATED_FUNDING_WINDOW_SECONDS Optional Vault->Predict funding window duration"
+    )
     print("  OPENROUTER_API_KEY          hedge analysis model access")
     print()
     print("Notes:")
@@ -110,6 +139,27 @@ def print_help() -> None:
     print("  - Mainnet requires PREDICT_API_KEY for authenticated predict.fun flows.")
     print(
         "  - Predict Account mode is supported through wallet subcommands and signed flows."
+    )
+    print(
+        "  - read-only blocks signer-backed wallet/trading flows; eoa and predict-account preserve the existing live signer paths."
+    )
+    print(
+        "  - Pure mandated-vault remains advanced explicit opt-in, but `predict-account + ERC_MANDATED_*` is the preferred advanced funding route."
+    )
+    print(
+        "  - ERC_MANDATED_VAULT_ADDRESS selects an explicit deployed vault; otherwise the full derivation tuple lets the MCP predict the vault address."
+    )
+    print(
+        "  - Overlay wallet status/deposit expose `vault-to-predict-account` routing: Predict Account stays the trading identity while Vault funds it, and undeployed vault setup remains manual-only."
+    )
+    print(
+        "  - Trust boundary: the MCP orchestrates transport/preparation; the vault contract policy authorizes what execution is allowed."
+    )
+    print(
+        "  - Pure mandated-vault v1 does not provide predict.fun trading parity; unsupported-in-mandated-vault-v1 still applies to pure mandated-vault buy/positions/hedge flows."
+    )
+    print(
+        "  - Overlay buy can proceed when funded, and otherwise returns deterministic funding-required guidance that points to wallet deposit --json."
     )
 
 

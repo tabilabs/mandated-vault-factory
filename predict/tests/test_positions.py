@@ -6,8 +6,10 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from datetime import datetime, timezone
 
 from lib.config import PredictConfig
+from lib.position_storage import LocalPosition, PositionStorage
 
 positions_service_module = importlib.import_module("lib.positions_service")
 PositionsService = getattr(positions_service_module, "PositionsService")
@@ -75,3 +77,67 @@ def test_positions_cli_lists_and_shows_fixture_positions(tmp_path) -> None:
     assert any(item["source"] == "external" for item in all_payload)
     assert shown["positionId"] == "pos-123-yes"
     assert shown["marketId"] == "123"
+
+
+def test_positions_cli_mandated_vault_blocks_list_and_show_without_traceback() -> None:
+    env = {
+        "PREDICT_ENV": "testnet",
+        "PREDICT_STORAGE_DIR": "/tmp/predict",
+        "PREDICT_WALLET_MODE": "mandated-vault",
+        "ERC_MANDATED_VAULT_ADDRESS": "0x2222222222222222222222222222222222222222",
+    }
+
+    list_result = run_positions("list", "--json", env=env)
+    show_result = run_positions("show", "pos-123-yes", "--json", env=env)
+
+    assert list_result.returncode == 1
+    assert show_result.returncode == 1
+
+    list_combined = list_result.stdout + list_result.stderr
+    show_combined = show_result.stdout + show_result.stderr
+    assert "unsupported-in-mandated-vault-v1" in list_combined
+    assert "unsupported-in-mandated-vault-v1" in show_combined
+    assert "Traceback" not in list_combined
+    assert "Traceback" not in show_combined
+
+
+def test_positions_list_tolerates_overlay_funding_metadata_notes(tmp_path) -> None:
+    config = PredictConfig.from_env(
+        {
+            "PREDICT_ENV": "test-fixture",
+            "PREDICT_STORAGE_DIR": str(tmp_path),
+        }
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    storage = PositionStorage(config.storage_dir)
+    storage.seed(
+        [
+            LocalPosition(
+                position_id="pos-overlay-123-yes",
+                market_id="123",
+                question="Fixture question",
+                outcome_name="YES",
+                token_id="1001",
+                side="BUY",
+                strategy="MARKET",
+                entry_time=now,
+                entry_price=0.6,
+                quantity="25000000000000000000",
+                notional_usdt=25.0,
+                order_hash="0xoverlay",
+                order_status="OPEN",
+                fill_amount="25000000000000000000",
+                fee_rate_bps=100,
+                source="tracked",
+                notes='{"fundingRoute":"vault-to-predict-account"}',
+                status="OPEN",
+            )
+        ]
+    )
+    service = PositionsService(config)
+
+    merged = __import__("asyncio").run(service.list_positions(include_all=True))
+
+    tracked = next(item for item in merged if item.position_id == "pos-overlay-123-yes")
+    assert tracked.source == "tracked"
+    assert tracked.market_id == "123"

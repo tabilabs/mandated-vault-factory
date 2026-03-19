@@ -30,11 +30,12 @@ def resolve_outcome(market: MarketRecord, label: str) -> ResolvedOutcome:
     normalized = label.upper()
     for outcome in market.outcomes or []:
         if _matches_outcome(outcome, normalized):
-            if not outcome.tokenId:
+            token_id = outcome.tokenId or outcome.onChainId
+            if not token_id:
                 raise ConfigError(
                     f"Outcome {label} is missing a token id in market {market.id}."
                 )
-            return ResolvedOutcome(label=normalized, token_id=outcome.tokenId)
+            return ResolvedOutcome(label=normalized, token_id=token_id)
     raise ConfigError(f"Outcome {label} is not available for market {market.id}.")
 
 

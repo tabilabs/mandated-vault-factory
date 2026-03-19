@@ -68,8 +68,13 @@ class PredictAuthenticator:
         if self._config.wallet_mode == WalletMode.PREDICT_ACCOUNT:
             builder = self._builder_factory(self._config)
             signature = builder.sign_predict_account_message(message)
+            signer = self._config.auth_signer_address
+            if signer is None:
+                raise ConfigError(
+                    "Predict Account mode requires both PREDICT_ACCOUNT_ADDRESS and PREDICT_PRIVY_PRIVATE_KEY."
+                )
             return AuthRequest(
-                signer=self._config.predict_account_address or "",
+                signer=signer,
                 message=message,
                 signature=signature,
             )

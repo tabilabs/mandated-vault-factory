@@ -1,20 +1,37 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 from decimal import Decimal, InvalidOperation
+from inspect import isawaitable
 from typing import Any, Awaitable, Callable, Protocol, cast
 
 from predict_sdk import BuildOrderInput, LimitHelperInput, MarketHelperValueInput, Side
 
 from .api import PredictApiClient
 from .auth import PredictAuthenticator
-from .config import ConfigError, PredictConfig, RuntimeEnv
+from .config import (
+    ConfigError,
+    PredictConfig,
+    RuntimeEnv,
+    WalletMode,
+    mandated_vault_v1_unsupported_error,
+)
 from .fixture_api import FixturePredictApiClient
 from .orderbook import orderbook_record_to_sdk_book, resolve_outcome
 from .position_storage import LocalPosition, PositionStorage
-from .wallet_manager import FixtureWalletSdk, PredictSdkWallet, make_wallet_sdk
+from .wallet_manager import (
+    FixtureWalletSdk,
+    MandatedVaultBridgeProtocol,
+    PredictSdkWallet,
+    VaultToPredictAccountFundingOrchestration,
+    build_vault_to_predict_account_orchestration,
+    load_wallet_usdt_balance_wei,
+    make_wallet_sdk,
+)
+from .mandated_mcp_bridge import MandatedVaultMcpBridge
 
 
 @dataclass
@@ -49,6 +66,10 @@ class TradeApiClientProtocol(Protocol):
     async def get_jwt(self, auth_request: Any) -> Any: ...
 
 
+class OverlayOrchestrationProtocol(Protocol):
+    def to_dict(self) -> dict[str, object]: ...
+
+
 class TradeService:
     def __init__(
         self,
@@ -59,11 +80,21 @@ class TradeService:
         ]
         | None = None,
         wallet_sdk_factory: Callable[[PredictConfig], Any] = make_wallet_sdk,
+        bridge_factory: Callable[
+            [PredictConfig], MandatedVaultBridgeProtocol
+        ] = MandatedVaultMcpBridge,
+        overlay_orchestration_factory: Callable[
+            [PredictConfig, str, str, int],
+            Awaitable[OverlayOrchestrationProtocol] | OverlayOrchestrationProtocol,
+        ]
+        | None = None,
         sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
         self._config = config
         self._api_client_factory = api_client_factory or _default_api_client_factory
         self._wallet_sdk_factory = wallet_sdk_factory
+        self._bridge_factory = bridge_factory
+        self._overlay_orchestration_factory = overlay_orchestration_factory
         self._sleep = sleep or asyncio.sleep
 
     async def buy(
@@ -76,6 +107,9 @@ class TradeService:
         slippage_bps: int | None = None,
         expiration_minutes: int | None = None,
     ) -> TradeResult:
+        if self._config.wallet_mode == WalletMode.MANDATED_VAULT:
+            raise mandated_vault_v1_unsupported_error("buy")
+
         sdk = self._wallet_sdk_factory(self._config)
         if (
             isinstance(sdk, FixtureWalletSdk)
@@ -87,6 +121,32 @@ class TradeService:
 
         if not hasattr(sdk, "_builder"):
             raise ConfigError("Trading requires an SDK-backed wallet context.")
+
+        amount_wei = _parse_amount_to_wei(amount_usdt)
+        if amount_wei <= 0:
+            raise ConfigError("Trade amount must be greater than zero.")
+
+        position_notes: str | None = None
+        if _has_predict_account_overlay(self._config):
+            usdt_balance = await _sdk_usdt_balance_wei(sdk)
+            if usdt_balance < amount_wei:
+                orchestration = await self._build_overlay_orchestration(
+                    predict_account_address=sdk.funding_address,
+                    trade_signer_address=sdk.signer_address,
+                    current_usdt_balance_wei=usdt_balance,
+                    wallet_sdk=sdk,
+                )
+                raise ConfigError(
+                    _format_overlay_funding_required_error(
+                        orchestration,
+                        attempted_buy_amount_raw=amount_wei,
+                        current_balance_raw=usdt_balance,
+                    )
+                )
+            position_notes = _overlay_position_notes(
+                predict_account_address=sdk.funding_address,
+                trade_signer_address=sdk.signer_address,
+            )
 
         builder = sdk._builder
         api_client = cast(
@@ -100,15 +160,12 @@ class TradeService:
 
         market = await api_client.get_market(market_id)
         outcome = resolve_outcome(market, outcome_label)
-        orderbook = await api_client.get_orderbook(market_id)
-        sdk_book = orderbook_record_to_sdk_book(orderbook)
 
         strategy = "LIMIT" if limit_price is not None else "MARKET"
-        amount_wei = _parse_amount_to_wei(amount_usdt)
-        if amount_wei <= 0:
-            raise ConfigError("Trade amount must be greater than zero.")
 
         if strategy == "MARKET":
+            orderbook = await api_client.get_orderbook(market_id)
+            sdk_book = orderbook_record_to_sdk_book(orderbook)
             order_amounts = builder.get_market_order_amounts(
                 MarketHelperValueInput(
                     side=Side.BUY,
@@ -144,9 +201,14 @@ class TradeService:
             is_yield_bearing=bool(market.isYieldBearing),
         )
         signed_order = builder.sign_typed_data_order(typed_data)
+        signed_order_payload = asdict(signed_order)
+        if not signed_order_payload.get("hash") and hasattr(builder, "build_typed_data_hash"):
+            signed_order_payload["hash"] = builder.build_typed_data_hash(typed_data)
         created = await api_client.create_order(
             {
-                **asdict(signed_order),
+                "order": signed_order_payload,
+                "pricePerShare": str(order_amounts.price_per_share),
+                "strategy": strategy,
                 **({"slippageBps": slippage_bps} if slippage_bps is not None else {}),
                 **(
                     {"expirationMinutes": expiration_minutes}
@@ -156,7 +218,7 @@ class TradeService:
             }
         )
 
-        order_hash = created.hash or signed_order.hash or ""
+        order_hash = created.hash or signed_order_payload.get("hash") or signed_order.hash or ""
         polled = created
         if order_hash:
             for _ in range(15):
@@ -180,6 +242,7 @@ class TradeService:
             order_status=(polled.status or created.status or "OPEN").upper(),
             fill_amount=_extract_fill_amount(polled),
             fee_rate_bps=int(market.feeRateBps or 0),
+            notes=position_notes,
         )
 
         return TradeResult(
@@ -209,6 +272,7 @@ class TradeService:
         order_status: str,
         fill_amount: str | None,
         fee_rate_bps: int,
+        notes: str | None = None,
     ) -> None:
         now = datetime.now(timezone.utc).isoformat()
         position_id = f"pos-{market_id}-{outcome.lower()}"
@@ -231,9 +295,41 @@ class TradeService:
                 fill_amount=fill_amount,
                 fee_rate_bps=fee_rate_bps,
                 source="tracked",
+                notes=notes,
                 status="OPEN",
             )
         )
+
+    async def _build_overlay_orchestration(
+        self,
+        *,
+        predict_account_address: str,
+        trade_signer_address: str,
+        current_usdt_balance_wei: int,
+        wallet_sdk: Any | None = None,
+    ) -> OverlayOrchestrationProtocol:
+        if self._overlay_orchestration_factory is not None:
+            maybe = self._overlay_orchestration_factory(
+                self._config,
+                predict_account_address,
+                trade_signer_address,
+                current_usdt_balance_wei,
+            )
+            return await maybe if isawaitable(maybe) else maybe
+
+        bridge = self._bridge_factory(self._config)
+        await bridge.connect()
+        try:
+            return await build_vault_to_predict_account_orchestration(
+                self._config,
+                bridge,
+                predict_account_address=predict_account_address,
+                trade_signer_address=trade_signer_address,
+                current_usdt_balance_wei=current_usdt_balance_wei,
+                wallet_sdk=wallet_sdk,
+            )
+        finally:
+            await bridge.close()
 
     async def _buy_fixture(
         self,
@@ -298,6 +394,177 @@ def _extract_fill_amount(order: Any) -> str | None:
         if value is not None:
             return str(value)
     return None
+
+
+def _has_predict_account_overlay(config: PredictConfig) -> bool:
+    return (
+        config.wallet_mode == WalletMode.PREDICT_ACCOUNT
+        and config.has_mandated_config_input
+    )
+
+
+async def _sdk_usdt_balance_wei(sdk: Any) -> int:
+    getter = getattr(sdk, "get_usdt_balance_wei", None)
+    if not callable(getter):
+        raise ConfigError(
+            "Predict-account + vault overlay buy requires a wallet SDK that reports USDT balance."
+        )
+    value = await load_wallet_usdt_balance_wei(cast(Any, sdk))
+    try:
+        return int(cast(Any, value))
+    except (TypeError, ValueError) as error:
+        raise ConfigError(
+            "Predict-account + vault overlay buy requires a numeric USDT balance from wallet SDK."
+        ) from error
+
+
+def _overlay_position_notes(
+    *,
+    predict_account_address: str,
+    trade_signer_address: str,
+) -> str:
+    return json.dumps(
+        {
+            "fundingRoute": "vault-to-predict-account",
+            "predictAccountAddress": predict_account_address,
+            "tradeSignerAddress": trade_signer_address,
+            "overlayActive": True,
+        },
+        separators=(",", ":"),
+    )
+
+
+def _format_overlay_funding_required_error(
+    orchestration: OverlayOrchestrationProtocol,
+    *,
+    attempted_buy_amount_raw: int,
+    current_balance_raw: int,
+) -> str:
+    payload = orchestration.to_dict()
+    funding_target = payload.get("fundingTarget", {})
+    if not isinstance(funding_target, dict):
+        funding_target = {}
+    shortfall_raw = max(attempted_buy_amount_raw - max(current_balance_raw, 0), 0)
+    route = str(payload.get("fundingRoute", "vault-to-predict-account"))
+    required = str(shortfall_raw)
+    current = str(max(current_balance_raw, 0))
+    recipient = str(
+        funding_target.get(
+            "recipient",
+            payload.get("predictAccountAddress", "unknown"),
+        )
+    )
+    next_step = payload.get("fundingNextStep", {})
+    if not isinstance(next_step, dict):
+        next_step = {}
+    task = next_step.get("task", {})
+    if not isinstance(task, dict):
+        task = {}
+    next_step_kind = str(task.get("kind", "unknown"))
+    session_status, current_step, session_outcome = _overlay_session_state(payload)
+    return (
+        "buy: funding-required for predict-account overlay. "
+        f"attemptedBuyAmountRaw={attempted_buy_amount_raw} "
+        f"route={route} recipient={recipient} "
+        f"requiredAmountRaw={required} currentBalanceRaw={current} "
+        f"nextStepKind={next_step_kind} "
+        f"sessionStatus={session_status} currentStep={current_step} "
+        f"sessionOutcome={session_outcome}. "
+        "Vault funding automation is not enabled in this local signer context; "
+        "run `wallet deposit --json` and execute the returned session-backed next step before retrying buy."
+    )
+
+
+def _overlay_session_state(payload: dict[str, object]) -> tuple[str, str, str]:
+    session = payload.get("fundingSession", {})
+    if not isinstance(session, dict):
+        session = {}
+    session_status = str(session.get("status", "unknown"))
+    current_step = str(session.get("currentStep", "unknown"))
+
+    funding_step = session.get("fundingStep", {})
+    if not isinstance(funding_step, dict):
+        funding_step = {}
+    follow_up_step = session.get("followUpStep", {})
+    if not isinstance(follow_up_step, dict):
+        follow_up_step = {}
+
+    funding_target = payload.get("fundingTarget", {})
+    if not isinstance(funding_target, dict):
+        funding_target = {}
+
+    if _overlay_balance_snapshot_is_stale(payload, funding_target):
+        return session_status, current_step, "stale-balance"
+    if session_status == "failed" and funding_step.get("status") == "failed":
+        return session_status, current_step, "funding-failed"
+    if session_status == "failed" and follow_up_step.get("status") == "failed":
+        return session_status, current_step, "follow-up-failed"
+    if session_status == "pendingFunding":
+        return session_status, current_step, "pending-funding"
+    if session_status == "pendingFollowUp":
+        return session_status, current_step, "pending-follow-up"
+    if session_status in {"succeeded", "failed", "skipped"}:
+        return session_status, current_step, session_status
+    return session_status, current_step, "unknown"
+
+
+def _overlay_balance_snapshot_is_stale(
+    payload: dict[str, object],
+    funding_target: dict[str, object],
+) -> bool:
+    for snapshot_target, evaluated_at_raw in _overlay_snapshot_sources(
+        payload, funding_target
+    ):
+        balance_snapshot = snapshot_target.get("balanceSnapshot", {})
+        if not isinstance(balance_snapshot, dict):
+            continue
+        snapshot_at = _parse_overlay_timestamp(balance_snapshot.get("snapshotAt"))
+        evaluated_at = _parse_overlay_timestamp(evaluated_at_raw)
+        if snapshot_at is None or evaluated_at is None:
+            continue
+        try:
+            max_staleness_seconds = int(balance_snapshot.get("maxStalenessSeconds", 0))
+        except (TypeError, ValueError):
+            continue
+        if (evaluated_at - snapshot_at).total_seconds() > max_staleness_seconds:
+            return True
+    return False
+
+
+def _overlay_snapshot_sources(
+    payload: dict[str, object],
+    funding_target: dict[str, object],
+) -> list[tuple[dict[str, object], object]]:
+    sources: list[tuple[dict[str, object], object]] = []
+
+    session = payload.get("fundingSession", {})
+    if isinstance(session, dict):
+        plan = session.get("fundAndActionPlan", {})
+        if isinstance(plan, dict):
+            session_target = plan.get("fundingTarget", {})
+            if isinstance(session_target, dict):
+                sources.append((session_target, plan.get("evaluatedAt")))
+
+    plan_payload = payload.get("fundingPlan", {})
+    if isinstance(plan_payload, dict):
+        plan_target = plan_payload.get("fundingTarget", {})
+        if isinstance(plan_target, dict):
+            sources.append((plan_target, plan_payload.get("evaluatedAt")))
+
+    sources.append((funding_target, payload.get("evaluatedAt")))
+    return sources
+
+
+def _parse_overlay_timestamp(raw: object) -> datetime | None:
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 async def _async_no_sleep(_seconds: float) -> None:
