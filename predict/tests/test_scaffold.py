@@ -9,7 +9,7 @@ from conftest import get_predict_root, parse_env_file_keys
 REQUIRED_LAYOUT = {
     "pyproject.toml",
     ".gitignore",
-    ".env.example",
+    "env.example",
     "README.md",
     "lib/__init__.py",
     "tests/conftest.py",
@@ -64,8 +64,15 @@ def test_project_metadata_and_layout() -> None:
 
 def test_env_example_contains_required_predict_keys() -> None:
     predict_root = get_predict_root()
-    env_path = predict_root / ".env.example"
+    env_path = predict_root / "env.example"
     keys = parse_env_file_keys(env_path)
 
     missing = sorted(REQUIRED_ENV_KEYS - keys)
     assert missing == []
+
+
+def test_gitignore_excludes_clawhub_incompatible_artifacts() -> None:
+    predict_root = get_predict_root()
+    gitignore = (predict_root / ".gitignore").read_text()
+
+    assert "artifacts/" in gitignore
