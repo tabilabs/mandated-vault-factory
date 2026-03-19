@@ -16,7 +16,7 @@ PredictClaw is the predict.fun-native OpenClaw skill for browsing markets, check
 clawhub install predictclaw
 cd ~/.openclaw/skills/predictclaw
 uv sync
-touch .env
+cp env.example .env
 ```
 
 In packaged installs, the skill base directory is usually `~/.openclaw/skills/predictclaw`. In OpenClaw manifests and examples, this same location may appear as `{baseDir}`.
@@ -28,7 +28,7 @@ In packaged installs, the skill base directory is usually `~/.openclaw/skills/pr
 
 ```bash
 cd {baseDir} && uv sync
-cd {baseDir} && touch .env
+cd {baseDir} && cp env.example .env
 ```
 
 ## How configuration actually works
@@ -45,9 +45,9 @@ If your OpenClaw host version injects environment variables into the skill proce
 ## Mode reminders
 
 1. Run `uv sync` in the installed skill directory.
-2. Create `.env` inside `~/.openclaw/skills/predictclaw/`.
+2. Copy `env.example` to `.env` inside `~/.openclaw/skills/predictclaw/`.
 3. Pick exactly one wallet mode.
-4. Paste only the variables required for that mode from the snippets below.
+4. Fill only the variables required for that mode.
 5. Verify with:
 
 ```bash
