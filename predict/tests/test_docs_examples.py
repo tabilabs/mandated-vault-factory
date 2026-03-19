@@ -67,7 +67,7 @@ def test_documented_commands_exist_in_cli_help() -> None:
 
 def test_documented_env_vars_match_env_example() -> None:
     predict_root = get_predict_root()
-    env_keys = parse_env_file_keys(predict_root / ".env.example")
+    env_keys = parse_env_file_keys(predict_root / "env.example")
     readme = (predict_root / "README.md").read_text()
     skill = (predict_root / "SKILL.md").read_text()
 
@@ -75,6 +75,19 @@ def test_documented_env_vars_match_env_example() -> None:
     for key in DOC_ENV_VARS:
         assert key in readme
         assert key in skill
+
+
+def test_packaged_install_docs_reference_published_env_template() -> None:
+    predict_root = get_predict_root()
+    readme = (predict_root / "README.md").read_text()
+    skill = (predict_root / "SKILL.md").read_text()
+    chinese = (predict_root / "README.zh-CN.md").read_text()
+    root_readme = (predict_root.parent / "README.md").read_text()
+    onboarding = (predict_root.parent / "docs" / "onboarding.md").read_text()
+
+    for text in [readme, skill, chinese, root_readme, onboarding]:
+        assert "env.example" in text
+        assert ".env.example" not in text
 
 
 def test_docs_cover_wallet_modes_and_mandated_vault_boundaries() -> None:
