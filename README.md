@@ -80,6 +80,43 @@ forge coverage --report summary --ir-minimum
 forge build --sizes
 ```
 
+## Auxiliary Tools
+
+This repository also ships an isolated Python auxiliary tool at `predict/` for the **PredictClaw** predict.fun skill.
+
+```bash
+cd predict
+uv sync
+uv run pytest -q
+uv run python scripts/predictclaw.py --help
+```
+
+For packaged OpenClaw installs, the recommended first-time setup is to copy `predict/.env.example` to `~/.openclaw/skills/predictclaw/.env` and fill the mode-specific env vars there. PredictClaw itself reads plain environment variables plus that local `.env` file.
+
+Use fixture mode for secret-free verification:
+
+```bash
+cd predict
+PREDICT_ENV=test-fixture uv run python scripts/predictclaw.py markets trending --json
+PREDICT_ENV=test-fixture uv run python scripts/predictclaw.py wallet deposit --json
+```
+
+PredictClaw wallet/runtime paths are now explicit:
+
+- `read-only` — browsing only
+- `eoa` — direct signer path
+- `predict-account` — predict.fun smart-wallet path and official trading identity
+- `mandated-vault` — advanced explicit opt-in vault control-plane path
+
+For pure `mandated-vault`, set `PREDICT_WALLET_MODE=mandated-vault` and either:
+
+- provide `ERC_MANDATED_VAULT_ADDRESS` for an already-known deployed vault, or
+- provide the full derivation tuple (`ERC_MANDATED_FACTORY_ADDRESS`, `ERC_MANDATED_VAULT_ASSET_ADDRESS`, `ERC_MANDATED_VAULT_NAME`, `ERC_MANDATED_VAULT_SYMBOL`, `ERC_MANDATED_VAULT_AUTHORITY`, `ERC_MANDATED_VAULT_SALT`) so PredictClaw can ask the MCP for the predicted vault address and prepare a manual-only create-vault transaction summary.
+
+For the preferred advanced trading route, keep `PREDICT_WALLET_MODE=predict-account` and add `ERC_MANDATED_*` as a Vault funding overlay. In that route, Predict Account remains the deposit/trading account, Vault funds the Predict Account through MCP-backed `vault-to-predict-account` planning, and low-balance buy attempts return deterministic `funding-required` guidance instead of silently executing a vault leg.
+
+Trust boundary: the MCP orchestrates transport/preparation; the vault contract policy authorizes what the vault can actually execute. In v1, pure mandated-vault is intentionally limited to control-plane/status/deposit preparation and does **not** provide predict.fun trading parity. Unsupported pure-mandated flows fail closed with `unsupported-in-mandated-vault-v1`.
+
 ## BSC Testnet Deployment (P0)
 
 The repository includes minimal deployment artifacts for BSC Testnet:
