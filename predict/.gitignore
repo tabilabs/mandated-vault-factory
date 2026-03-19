@@ -1,0 +1,22 @@
+# Local environment
+.env
+
+# Virtualenvs and Python caches
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Local machine noise
+.DS_Store

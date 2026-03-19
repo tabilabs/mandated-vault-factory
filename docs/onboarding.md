@@ -23,6 +23,12 @@ Local checks (same as CI intent):
 forge fmt --check
 forge build --sizes
 forge test -vvv
+
+# PredictClaw (Python skill package)
+cd predict
+uv sync
+uv run pytest -q
+uv run python scripts/predictclaw.py --help
 ```
 
 ## 3. Recommended Reading Order
@@ -55,3 +61,10 @@ forge test -vvv
 - `docs/architecture.md`
 - `docs/flows.md`
 - `docs/onboarding.md`
+
+## 7. PredictClaw Contributor Notes
+
+- The Python skill package lives in `predict/` and keeps its own `.venv`, tests, and `.env.example`.
+- Use `PREDICT_ENV=test-fixture` for secret-free CLI and integration verification.
+- `predict/SKILL.md` is OpenClaw-facing install/use documentation; `predict/README.md` is repo-local contributor documentation.
+- Do not add public CLI verbs beyond the current command contract without updating tests, docs, and `scripts/predictclaw.py --help` together.

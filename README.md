@@ -80,6 +80,25 @@ forge coverage --report summary --ir-minimum
 forge build --sizes
 ```
 
+## Auxiliary Tools
+
+This repository also ships an isolated Python auxiliary tool at `predict/` for the **PredictClaw** predict.fun skill.
+
+```bash
+cd predict
+uv sync
+uv run pytest -q
+uv run python scripts/predictclaw.py --help
+```
+
+Use fixture mode for secret-free verification:
+
+```bash
+cd predict
+PREDICT_ENV=test-fixture uv run python scripts/predictclaw.py markets trending --json
+PREDICT_ENV=test-fixture uv run python scripts/predictclaw.py wallet deposit --json
+```
+
 ## BSC Testnet Deployment (P0)
 
 The repository includes minimal deployment artifacts for BSC Testnet:

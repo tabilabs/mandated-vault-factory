@@ -1,0 +1,123 @@
+{
+  "markets": [
+    {
+      "id": "123",
+      "title": "US election winner 2028",
+      "question": "Will the 2028 U.S. election winner be the Democratic nominee?",
+      "status": "OPEN",
+      "categorySlug": "politics",
+      "decimalPrecision": 2,
+      "feeRateBps": 100,
+      "volume24hUsd": 200000.0,
+      "isNegRisk": false,
+      "isYieldBearing": false,
+      "outcomes": [
+        {"id": "123-yes", "name": "YES", "tokenId": "1001"},
+        {"id": "123-no", "name": "NO", "tokenId": "1002"}
+      ]
+    },
+    {
+      "id": "456",
+      "title": "Election turnout above 60%",
+      "question": "Will U.S. national election turnout exceed 60% in 2028?",
+      "status": "OPEN",
+      "categorySlug": "politics",
+      "decimalPrecision": 2,
+      "feeRateBps": 75,
+      "volume24hUsd": 150000.0,
+      "isNegRisk": false,
+      "isYieldBearing": false,
+      "outcomes": [
+        {"id": "456-yes", "name": "YES", "tokenId": "2001"},
+        {"id": "456-no", "name": "NO", "tokenId": "2002"}
+      ]
+    },
+    {
+      "id": "789",
+      "title": "BNB above 1000",
+      "question": "Will BNB trade above 1000 USDT before 2027?",
+      "status": "OPEN",
+      "categorySlug": "crypto",
+      "decimalPrecision": 2,
+      "feeRateBps": 50,
+      "volume24hUsd": 50000.0,
+      "isNegRisk": false,
+      "isYieldBearing": true,
+      "outcomes": [
+        {"id": "789-yes", "name": "YES", "tokenId": "3001"},
+        {"id": "789-no", "name": "NO", "tokenId": "3002"}
+      ]
+    },
+    {
+      "id": "101",
+      "title": "Democratic nominee wins 2028 election",
+      "question": "Will the Democratic nominee win the 2028 election?",
+      "status": "OPEN",
+      "categorySlug": "politics",
+      "decimalPrecision": 2,
+      "feeRateBps": 90,
+      "volume24hUsd": 120000.0,
+      "isNegRisk": false,
+      "isYieldBearing": false,
+      "outcomes": [
+        {"id": "101-yes", "name": "YES", "tokenId": "4001"},
+        {"id": "101-no", "name": "NO", "tokenId": "4002"}
+      ]
+    },
+    {
+      "id": "202",
+      "title": "Election called by November 2028",
+      "question": "Will the 2028 election be officially called by November 15, 2028?",
+      "status": "OPEN",
+      "categorySlug": "politics",
+      "decimalPrecision": 2,
+      "feeRateBps": 80,
+      "volume24hUsd": 110000.0,
+      "isNegRisk": false,
+      "isYieldBearing": false,
+      "outcomes": [
+        {"id": "202-yes", "name": "YES", "tokenId": "5001"},
+        {"id": "202-no", "name": "NO", "tokenId": "5002"}
+      ]
+    }
+  ],
+  "stats": {
+    "123": {"marketId": "123", "volume24hUsd": 200000.0, "liquidityUsd": 500000.0},
+    "456": {"marketId": "456", "volume24hUsd": 150000.0, "liquidityUsd": 320000.0},
+    "789": {"marketId": "789", "volume24hUsd": 50000.0, "liquidityUsd": 90000.0},
+    "101": {"marketId": "101", "volume24hUsd": 120000.0, "liquidityUsd": 210000.0},
+    "202": {"marketId": "202", "volume24hUsd": 110000.0, "liquidityUsd": 205000.0}
+  },
+  "last_sales": {
+    "123": {"marketId": "123", "price": 0.61, "side": "BUY"},
+    "456": {"marketId": "456", "price": 0.34, "side": "SELL"},
+    "789": {"marketId": "789", "price": 0.46, "side": "BUY"},
+    "101": {"marketId": "101", "price": 0.58, "side": "BUY"},
+    "202": {"marketId": "202", "price": 0.72, "side": "BUY"}
+  },
+  "orderbooks": {
+    "123": {"marketId": "123", "asks": [[0.62, 100.0]], "bids": [[0.58, 80.0]], "updateTimestampMs": 1},
+    "456": {"marketId": "456", "asks": [[0.35, 120.0]], "bids": [[0.31, 90.0]], "updateTimestampMs": 2},
+    "789": {"marketId": "789", "asks": [[0.48, 140.0]], "bids": [[0.44, 100.0]], "updateTimestampMs": 3},
+    "101": {"marketId": "101", "asks": [[0.60, 90.0]], "bids": [[0.56, 90.0]], "updateTimestampMs": 4},
+    "202": {"marketId": "202", "asks": [[0.74, 120.0]], "bids": [[0.70, 120.0]], "updateTimestampMs": 5}
+  },
+  "positions": [
+    {
+      "positionId": "remote-123-yes",
+      "marketId": "123",
+      "tokenId": "1001",
+      "outcomeName": "YES",
+      "quantity": "25000000000000000000",
+      "status": "OPEN"
+    },
+    {
+      "positionId": "remote-456-no",
+      "marketId": "456",
+      "tokenId": "2002",
+      "outcomeName": "NO",
+      "quantity": "5000000000000000000",
+      "status": "OPEN"
+    }
+  ]
+}

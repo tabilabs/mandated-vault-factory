@@ -1,0 +1,15 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.11",
+  "include": [
+    "lib",
+    "scripts",
+    "tests"
+  ],
+  "extraPaths": [
+    ".",
+    "./lib"
+  ],
+  "reportMissingModuleSource": false
+}
