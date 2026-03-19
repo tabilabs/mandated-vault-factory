@@ -77,7 +77,7 @@ def test_documented_env_vars_match_env_example() -> None:
         assert key in skill
 
 
-def test_packaged_install_docs_reference_published_env_template() -> None:
+def test_packaged_install_docs_inline_env_setup() -> None:
     predict_root = get_predict_root()
     readme = (predict_root / "README.md").read_text()
     skill = (predict_root / "SKILL.md").read_text()
@@ -85,9 +85,17 @@ def test_packaged_install_docs_reference_published_env_template() -> None:
     root_readme = (predict_root.parent / "README.md").read_text()
     onboarding = (predict_root.parent / "docs" / "onboarding.md").read_text()
 
-    for text in [readme, skill, chinese, root_readme, onboarding]:
-        assert "env.example" in text
-        assert ".env.example" not in text
+    for text in [readme, skill, chinese]:
+        assert "cp env.example .env" not in text
+        assert "Copy `env.example` to `.env`" not in text
+        assert (
+            "Create `.env`" in text or "create `.env`" in text or "创建 `.env`" in text
+        )
+
+    for text in [root_readme, onboarding]:
+        assert "predict/env.example" not in text
+        assert "predict/.env.example" not in text
+        assert ".env`" in text or "`.env`" in text
 
 
 def test_docs_cover_wallet_modes_and_mandated_vault_boundaries() -> None:
