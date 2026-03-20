@@ -8,6 +8,8 @@ metadata: {"openclaw":{"emoji":"🔮","homepage":"https://predict.fun","requires
 
 PredictClaw is the predict.fun-native OpenClaw skill for browsing markets, checking wallet readiness, viewing deposit addresses, withdrawing funds, placing buys, inspecting positions, and scanning hedge opportunities.
 
+PredictClaw's version source of truth is `predict/pyproject.toml`. When checking GitHub or packaging metadata, use the `predict/` subdirectory; the repository root is the Foundry workspace and does not define a PredictClaw `pyproject.toml`.
+
 ## Install
 
 ### ClawHub / packaged install
