@@ -123,6 +123,8 @@ def test_top_level_help_exposes_planned_command_surface() -> None:
     assert "unsupported-in-mandated-vault-v1" in combined
     assert "vault-to-predict-account" in combined
     assert "funding-required" in combined
+    assert "api-testnet.predict.fun" in combined
+    assert "wallet status requires signer configuration" in combined
 
 
 def test_unknown_command_fails_cleanly() -> None:

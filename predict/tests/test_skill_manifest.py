@@ -13,9 +13,12 @@ def test_skill_manifest_openclaw_contract() -> None:
     openclaw = frontmatter["metadata"]["openclaw"]
     assert openclaw["emoji"]
     assert openclaw["homepage"] == "https://predict.fun"
-    assert openclaw["primaryEnv"] == "PREDICT_PRIVATE_KEY"
     assert "uv" in openclaw["requires"]["bins"]
-    assert "PREDICT_PRIVATE_KEY" in openclaw["requires"]["env"]
+    assert openclaw["requires"]["env"] == [
+        "PREDICT_ENV",
+        "PREDICT_WALLET_MODE",
+    ]
+    assert "primaryEnv" not in openclaw
     assert "install" in openclaw
 
     assert "{baseDir}" in body

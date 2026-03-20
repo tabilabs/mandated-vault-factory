@@ -9,7 +9,11 @@ from conftest import get_predict_root, parse_env_file_keys
 REQUIRED_LAYOUT = {
     "pyproject.toml",
     ".gitignore",
-    "env.example",
+    ".env.example",
+    ".env.readonly.example",
+    ".env.eoa.example",
+    ".env.predict-account.example",
+    ".env.mandated-vault.example",
     "README.md",
     "lib/__init__.py",
     "tests/conftest.py",
@@ -64,7 +68,7 @@ def test_project_metadata_and_layout() -> None:
 
 def test_env_example_contains_required_predict_keys() -> None:
     predict_root = get_predict_root()
-    env_path = predict_root / "env.example"
+    env_path = predict_root / ".env.example"
     keys = parse_env_file_keys(env_path)
 
     missing = sorted(REQUIRED_ENV_KEYS - keys)
@@ -76,3 +80,15 @@ def test_gitignore_excludes_clawhub_incompatible_artifacts() -> None:
     gitignore = (predict_root / ".gitignore").read_text()
 
     assert "artifacts/" in gitignore
+
+
+def test_default_env_example_is_bootstrap_safe_for_first_install() -> None:
+    predict_root = get_predict_root()
+    env_text = (predict_root / ".env.example").read_text()
+
+    assert "PREDICT_ENV=test-fixture" in env_text
+    assert "PREDICT_WALLET_MODE=read-only" in env_text
+    assert ".env.readonly.example" in env_text
+    assert ".env.eoa.example" in env_text
+    assert ".env.predict-account.example" in env_text
+    assert ".env.mandated-vault.example" in env_text
