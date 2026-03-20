@@ -16,7 +16,7 @@ PredictClaw is the predict.fun-native OpenClaw skill for browsing markets, check
 clawhub install predictclaw
 cd ~/.openclaw/skills/predictclaw
 uv sync
-touch .env
+cp template.env .env
 ```
 
 In packaged installs, the skill base directory is usually `~/.openclaw/skills/predictclaw`. In OpenClaw manifests and examples, this same location may appear as `{baseDir}`.
@@ -28,7 +28,7 @@ In packaged installs, the skill base directory is usually `~/.openclaw/skills/pr
 
 ```bash
 cd {baseDir} && uv sync
-cd {baseDir} && touch .env
+cd {baseDir} && cp template.env .env
 ```
 
 ## How configuration actually works
@@ -48,11 +48,11 @@ The SKILL frontmatter metadata intentionally lists only the universal entry vari
 
 1. Run `uv sync` in the installed skill directory.
 2. Pick a bootstrap file:
-   - `.env.example` -> secret-free local fixture bootstrap
-   - `.env.readonly.example` -> live read-only market reads
-   - `.env.eoa.example` -> direct private-key trading
-   - `.env.predict-account.example` -> Predict Account trading
-   - `.env.mandated-vault.example` -> advanced vault control-plane / overlay
+   - `template.env` -> secret-free local fixture bootstrap
+   - `template.readonly.env` -> live read-only market reads
+   - `template.eoa.env` -> direct private-key trading
+   - `template.predict-account.env` -> Predict Account trading
+   - `template.mandated-vault.env` -> advanced vault control-plane / overlay
 3. Copy the chosen file to `.env` inside `~/.openclaw/skills/predictclaw/`.
 4. Fill only the variables required for that mode.
 5. Verify with:
@@ -228,7 +228,7 @@ cd {baseDir} && uv run python scripts/predictclaw.py hedge analyze 101 202 --jso
 | Variable | Purpose |
 | --- | --- |
 | `PREDICT_STORAGE_DIR` | Local journal and position storage |
-| `PREDICT_ENV` | Defaults to `testnet` in code; `.env.example` intentionally bootstraps `test-fixture`; accepted values are `testnet`, `mainnet`, or `test-fixture` |
+| `PREDICT_ENV` | Defaults to `testnet` in code; `template.env` intentionally bootstraps `test-fixture`; accepted values are `testnet`, `mainnet`, or `test-fixture` |
 | `PREDICT_WALLET_MODE` | Explicit mode override: `read-only`, `eoa`, `predict-account`, or `mandated-vault` |
 | `PREDICT_API_BASE_URL` | Optional REST base override; leave empty to use the env-specific default (`api-testnet.predict.fun` for `testnet`, ignored in `test-fixture`, `api.predict.fun` for `mainnet`) |
 | `PREDICT_API_KEY` | Mainnet-authenticated predict.fun API access; required for mainnet market reads and trading |

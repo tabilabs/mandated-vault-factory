@@ -1,0 +1,5 @@
+artifacts/
+dist/
+tests/
+scripts/poc_*.py
+pyrightconfig.json

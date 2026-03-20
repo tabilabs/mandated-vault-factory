@@ -1,6 +1,6 @@
 [project]
 name = "predictclaw"
-version = "0.1.12"
+version = "0.1.13"
 description = "PredictClaw isolated predict.fun skill package"
 readme = "README.md"
 requires-python = ">=3.11"

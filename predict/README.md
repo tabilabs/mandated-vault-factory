@@ -26,7 +26,7 @@ For the advanced funding route, PredictClaw supports a **Vault funding overlay**
 clawhub install predictclaw
 cd ~/.openclaw/skills/predictclaw
 uv sync
-touch .env
+cp template.env .env
 ```
 
 In packaged installs, the skill base directory is usually `~/.openclaw/skills/predictclaw`. In OpenClaw manifests and examples, this same location may appear as `{baseDir}`.
@@ -38,7 +38,7 @@ In packaged installs, the skill base directory is usually `~/.openclaw/skills/pr
 
 ```bash
 cd {baseDir} && uv sync
-cd {baseDir} && touch .env
+cd {baseDir} && cp template.env .env
 ```
 
 ### Local repo development
@@ -68,11 +68,11 @@ The SKILL frontmatter metadata intentionally lists only the universal entry vari
 
 1. Install the skill and run `uv sync`.
 2. Pick a bootstrap file:
-   - `.env.example` -> secret-free local fixture bootstrap
-   - `.env.readonly.example` -> live read-only market reads
-   - `.env.eoa.example` -> direct private-key trading
-   - `.env.predict-account.example` -> Predict Account trading
-   - `.env.mandated-vault.example` -> advanced vault control-plane / overlay
+   - `template.env` -> secret-free local fixture bootstrap
+   - `template.readonly.env` -> live read-only market reads
+   - `template.eoa.env` -> direct private-key trading
+   - `template.predict-account.env` -> Predict Account trading
+   - `template.mandated-vault.env` -> advanced vault control-plane / overlay
 3. Copy the chosen template to `.env` inside `~/.openclaw/skills/predictclaw/`.
 4. Fill only the variables required for that mode.
 5. Verify the install with `uv run python scripts/predictclaw.py --help`.
@@ -84,11 +84,11 @@ The SKILL frontmatter metadata intentionally lists only the universal entry vari
 
 ## Bootstrap templates
 
-- `.env.example` -> safest first install; uses `test-fixture` + `read-only` so the CLI can start without secrets or network access
-- `.env.readonly.example` -> live market reads; mainnet market reads require PREDICT_API_KEY
-- `.env.eoa.example` -> EOA signer flow, starting on testnet with `https://api-testnet.predict.fun`
-- `.env.predict-account.example` -> Predict Account signer flow, starting on testnet with `https://api-testnet.predict.fun`
-- `.env.mandated-vault.example` -> advanced explicit opt-in template for vault control-plane usage
+- `template.env` -> safest first install; uses `test-fixture` + `read-only` so the CLI can start without secrets or network access
+- `template.readonly.env` -> live market reads; mainnet market reads require PREDICT_API_KEY
+- `template.eoa.env` -> EOA signer flow, starting on testnet with `https://api-testnet.predict.fun`
+- `template.predict-account.env` -> Predict Account signer flow, starting on testnet with `https://api-testnet.predict.fun`
+- `template.mandated-vault.env` -> advanced explicit opt-in template for vault control-plane usage
 
 ## Real first-install paths
 
@@ -101,7 +101,7 @@ uv run python scripts/predictclaw.py --help
 
 ### B. Secret-free local verification
 
-Copy `.env.example` and run:
+Copy `template.env` and run:
 
 ```bash
 uv run python scripts/predictclaw.py markets trending
@@ -112,7 +112,7 @@ Fixture mode only knows the bundled fixture market IDs (`123`, `456`, `789`, `10
 
 ### C. Live read-only market reads
 
-Copy `.env.readonly.example` and choose one of these paths:
+Copy `template.readonly.env` and choose one of these paths:
 
 - `mainnet` + valid `PREDICT_API_KEY` for live production reads
 - `testnet` + `https://api-testnet.predict.fun` for unauthenticated non-mainnet reads
@@ -329,7 +329,7 @@ uv run python scripts/predictclaw.py hedge analyze 101 202 --json
 | Variable | Purpose |
 | --- | --- |
 | `PREDICT_STORAGE_DIR` | Local journal and position storage |
-| `PREDICT_ENV` | Defaults to `testnet` in code; `.env.example` intentionally bootstraps `test-fixture`; accepted values are `testnet`, `mainnet`, or `test-fixture` |
+| `PREDICT_ENV` | Defaults to `testnet` in code; `template.env` intentionally bootstraps `test-fixture`; accepted values are `testnet`, `mainnet`, or `test-fixture` |
 | `PREDICT_WALLET_MODE` | Explicit mode override: `read-only`, `eoa`, `predict-account`, or `mandated-vault` |
 | `PREDICT_API_BASE_URL` | Optional REST base override; leave empty to use the env-specific default (`api-testnet.predict.fun` for `testnet`, ignored in `test-fixture`, `api.predict.fun` for `mainnet`) |
 | `PREDICT_API_KEY` | Mainnet-authenticated predict.fun API access; required for mainnet market reads and trading |

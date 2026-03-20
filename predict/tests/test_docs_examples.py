@@ -67,7 +67,7 @@ def test_documented_commands_exist_in_cli_help() -> None:
 
 def test_documented_env_vars_match_env_example() -> None:
     predict_root = get_predict_root()
-    env_keys = parse_env_file_keys(predict_root / ".env.example")
+    env_keys = parse_env_file_keys(predict_root / "template.env")
     readme = (predict_root / "README.md").read_text()
     skill = (predict_root / "SKILL.md").read_text()
 
@@ -86,7 +86,7 @@ def test_packaged_install_docs_inline_env_setup() -> None:
     onboarding = (predict_root.parent / "docs" / "onboarding.md").read_text()
 
     for text in [readme, skill, chinese, root_readme, onboarding]:
-        assert ".env.example" in text
+        assert "template.env" in text
 
 
 def test_docs_cover_wallet_modes_and_mandated_vault_boundaries() -> None:
@@ -152,19 +152,23 @@ def test_docs_explain_first_install_bootstrap_layers() -> None:
     readme_zh = (predict_root / "README.zh-CN.md").read_text()
 
     for text in [readme, skill]:
-        assert ".env.readonly.example" in text
-        assert ".env.eoa.example" in text
-        assert ".env.predict-account.example" in text
-        assert ".env.mandated-vault.example" in text
+        assert "template.env" in text
+        assert "template.readonly.env" in text
+        assert "template.eoa.env" in text
+        assert "template.predict-account.env" in text
+        assert "template.mandated-vault.env" in text
         assert "api-testnet.predict.fun" in text
         assert "wallet status requires signer configuration" in text
         assert "mainnet market reads require PREDICT_API_KEY" in text
         assert "test-fixture" in text
+        assert ".env.example" not in text
 
-    assert ".env.readonly.example" in readme_zh
-    assert ".env.eoa.example" in readme_zh
-    assert ".env.predict-account.example" in readme_zh
-    assert ".env.mandated-vault.example" in readme_zh
+    assert "template.env" in readme_zh
+    assert "template.readonly.env" in readme_zh
+    assert "template.eoa.env" in readme_zh
+    assert "template.predict-account.env" in readme_zh
+    assert "template.mandated-vault.env" in readme_zh
     assert "api-testnet.predict.fun" in readme_zh
     assert "wallet status 需要 signer 配置" in readme_zh
     assert "mainnet 的市场读取需要 PREDICT_API_KEY" in readme_zh
+    assert ".env.example" not in readme_zh
