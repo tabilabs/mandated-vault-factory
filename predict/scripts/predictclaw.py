@@ -136,12 +136,20 @@ def print_help() -> None:
     print()
     print("Notes:")
     print("  - Default local posture is testnet or fixture mode.")
-    print("  - Mainnet requires PREDICT_API_KEY for authenticated predict.fun flows.")
+    print(
+        "  - Mainnet market reads and trading require PREDICT_API_KEY for authenticated predict.fun flows."
+    )
+    print(
+        "  - Testnet market reads use https://api-testnet.predict.fun and do not require PREDICT_API_KEY."
+    )
     print(
         "  - Predict Account mode is supported through wallet subcommands and signed flows."
     )
     print(
         "  - read-only blocks signer-backed wallet/trading flows; eoa and predict-account preserve the existing live signer paths."
+    )
+    print(
+        "  - wallet status requires signer configuration; start read-only verification with markets trending instead."
     )
     print(
         "  - Pure mandated-vault remains advanced explicit opt-in, but `predict-account + ERC_MANDATED_*` is the preferred advanced funding route."
