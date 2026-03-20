@@ -67,14 +67,66 @@ The SKILL frontmatter metadata intentionally lists only the universal entry vari
 ## First-time setup (recommended)
 
 1. Install the skill and run `uv sync`.
-2. Copy `.env.example` to `.env` inside `~/.openclaw/skills/predictclaw/`.
-3. Pick exactly one wallet mode.
+2. Pick a bootstrap file:
+   - `.env.example` -> secret-free local fixture bootstrap
+   - `.env.readonly.example` -> live read-only market reads
+   - `.env.eoa.example` -> direct private-key trading
+   - `.env.predict-account.example` -> Predict Account trading
+   - `.env.mandated-vault.example` -> advanced vault control-plane / overlay
+3. Copy the chosen template to `.env` inside `~/.openclaw/skills/predictclaw/`.
 4. Fill only the variables required for that mode.
 5. Verify the install with `uv run python scripts/predictclaw.py --help`.
 6. Then run a mode-appropriate command:
-   - `read-only` -> `uv run python scripts/predictclaw.py markets trending`
+   - fixture bootstrap -> `uv run python scripts/predictclaw.py markets trending`
+   - live read-only -> `uv run python scripts/predictclaw.py markets trending`
    - `eoa` / `predict-account` -> `uv run python scripts/predictclaw.py wallet status --json`
    - `mandated-vault` -> `uv run python scripts/predictclaw.py wallet deposit --json`
+
+## Bootstrap templates
+
+- `.env.example` -> safest first install; uses `test-fixture` + `read-only` so the CLI can start without secrets or network access
+- `.env.readonly.example` -> live market reads; mainnet market reads require PREDICT_API_KEY
+- `.env.eoa.example` -> EOA signer flow, starting on testnet with `https://api-testnet.predict.fun`
+- `.env.predict-account.example` -> Predict Account signer flow, starting on testnet with `https://api-testnet.predict.fun`
+- `.env.mandated-vault.example` -> advanced explicit opt-in template for vault control-plane usage
+
+## Real first-install paths
+
+### A. CLI boots successfully
+
+```bash
+uv sync
+uv run python scripts/predictclaw.py --help
+```
+
+### B. Secret-free local verification
+
+Copy `.env.example` and run:
+
+```bash
+uv run python scripts/predictclaw.py markets trending
+```
+
+This uses `test-fixture`, so it proves the skill boots and routes commands correctly without touching the live API.
+Fixture mode only knows the bundled fixture market IDs (`123`, `456`, `789`, `101`, `202`). For real market IDs, switch to the live read-only template first.
+
+### C. Live read-only market reads
+
+Copy `.env.readonly.example` and choose one of these paths:
+
+- `mainnet` + valid `PREDICT_API_KEY` for live production reads
+- `testnet` + `https://api-testnet.predict.fun` for unauthenticated non-mainnet reads
+
+```bash
+uv run python scripts/predictclaw.py markets trending
+uv run python scripts/predictclaw.py market <market_id> --json
+```
+
+If mainnet reads fail with `401 unauthorized`, your `PREDICT_API_KEY` is missing or invalid.
+
+### D. Signer-backed flows
+
+wallet status requires signer configuration. `wallet status --json` is the right next step for `eoa` and `predict-account`, but it is not the first command to run in `read-only` mode.
 
 ## Configuration examples
 
@@ -82,21 +134,31 @@ The snippets below are `.env` examples. Put them in `{baseDir}/.env` or export t
 
 `OPENROUTER_API_KEY` only matters for non-fixture `hedge scan` / `hedge analyze` usage. It is not required for market, wallet, or buy flows.
 
-### read-only mode
+### bootstrap-safe fixture mode
 
 ```dotenv
 PREDICT_ENV=test-fixture
 PREDICT_WALLET_MODE=read-only
 ```
 
-Use this for market browsing only. Switch to `eoa`, `predict-account`, or `mandated-vault` before using wallet or trade subcommands.
+Use this for secret-free CLI verification and local market browsing only. It does not hit the live API. Switch to `eoa`, `predict-account`, or `mandated-vault` before using wallet or trade subcommands.
+
+### live read-only mode
+
+```dotenv
+PREDICT_ENV=mainnet
+PREDICT_WALLET_MODE=read-only
+PREDICT_API_KEY=YOUR_PREDICT_API_KEY
+```
+
+Mainnet market reads require PREDICT_API_KEY. If you want unauthenticated non-mainnet reads instead, use `PREDICT_ENV=testnet` plus `PREDICT_API_BASE_URL=https://api-testnet.predict.fun`.
 
 ### eoa mode
 
 ```dotenv
 PREDICT_ENV=testnet
 PREDICT_WALLET_MODE=eoa
-PREDICT_API_BASE_URL=https://dev.predict.fun
+PREDICT_API_BASE_URL=https://api-testnet.predict.fun
 PREDICT_PRIVATE_KEY=0xYOUR_EOA_PRIVATE_KEY
 ```
 
@@ -105,7 +167,7 @@ PREDICT_PRIVATE_KEY=0xYOUR_EOA_PRIVATE_KEY
 ```dotenv
 PREDICT_ENV=testnet
 PREDICT_WALLET_MODE=predict-account
-PREDICT_API_BASE_URL=https://dev.predict.fun
+PREDICT_API_BASE_URL=https://api-testnet.predict.fun
 PREDICT_ACCOUNT_ADDRESS=0xYOUR_PREDICT_ACCOUNT
 PREDICT_PRIVY_PRIVATE_KEY=0xYOUR_PRIVY_EXPORTED_KEY
 ```
@@ -147,7 +209,7 @@ In that path, PredictClaw asks the MCP to predict the vault address and, when th
 ```dotenv
 PREDICT_ENV=testnet
 PREDICT_WALLET_MODE=predict-account
-PREDICT_API_BASE_URL=https://dev.predict.fun
+PREDICT_API_BASE_URL=https://api-testnet.predict.fun
 PREDICT_ACCOUNT_ADDRESS=0xYOUR_PREDICT_ACCOUNT
 PREDICT_PRIVY_PRIVATE_KEY=0xYOUR_PRIVY_EXPORTED_KEY
 ERC_MANDATED_VAULT_ADDRESS=0xYOUR_DEPLOYED_VAULT
@@ -198,6 +260,9 @@ Pure `mandated-vault` does **not** provide predict.fun trading parity. `wallet a
 ### Common configuration mistakes
 
 - `read-only` is browse-only. Start with `markets ...`, not signer-backed wallet or trade commands.
+- `wallet status` requires signer configuration. In `read-only`, start with `markets trending` or `market <id> --json` instead.
+- `mainnet` market reads require `PREDICT_API_KEY`; missing keys fail early and invalid keys return `401 unauthorized`.
+- `testnet` market reads use `https://api-testnet.predict.fun`; the older `https://dev.predict.fun` endpoint no longer matches the current API contract.
 - `eoa` requires `PREDICT_PRIVATE_KEY` and rejects Predict Account or mandated-vault inputs.
 - `predict-account` requires both `PREDICT_ACCOUNT_ADDRESS` and `PREDICT_PRIVY_PRIVATE_KEY`.
 - `mainnet` requires `PREDICT_API_KEY`.
@@ -255,19 +320,19 @@ uv run python scripts/predictclaw.py hedge analyze 101 202 --json
 
 ## Runtime Modes
 
-- `test-fixture` — uses local JSON fixtures and deterministic wallet/hedge/trade behavior; ideal for development, integration tests, and CI.
-- `testnet` — intended for live but non-mainnet checks; use `PREDICT_API_BASE_URL` or `PREDICT_SMOKE_API_BASE_URL` if your target endpoint is `https://dev.predict.fun`.
-- `mainnet` — requires `PREDICT_API_KEY` and should be treated as a live-trading environment.
+- `test-fixture` — uses local JSON fixtures and deterministic wallet/hedge/trade behavior; ideal for development, integration tests, and secret-free first-install verification.
+- `testnet` — intended for live but non-mainnet checks; the current REST endpoint is `https://api-testnet.predict.fun` and market reads do not require `PREDICT_API_KEY`.
+- `mainnet` — requires `PREDICT_API_KEY` even for market reads and should be treated as a live-trading environment.
 
 ## Environment Variables
 
 | Variable | Purpose |
 | --- | --- |
 | `PREDICT_STORAGE_DIR` | Local journal and position storage |
-| `PREDICT_ENV` | Defaults to `testnet`; accepted values are `testnet`, `mainnet`, or `test-fixture` |
+| `PREDICT_ENV` | Defaults to `testnet` in code; `.env.example` intentionally bootstraps `test-fixture`; accepted values are `testnet`, `mainnet`, or `test-fixture` |
 | `PREDICT_WALLET_MODE` | Explicit mode override: `read-only`, `eoa`, `predict-account`, or `mandated-vault` |
-| `PREDICT_API_BASE_URL` | Optional REST base override; leave empty to use the env-specific default (`dev.predict.fun` for `testnet` / `test-fixture`, `api.predict.fun` for `mainnet`) |
-| `PREDICT_API_KEY` | Mainnet-authenticated predict.fun API access |
+| `PREDICT_API_BASE_URL` | Optional REST base override; leave empty to use the env-specific default (`api-testnet.predict.fun` for `testnet`, ignored in `test-fixture`, `api.predict.fun` for `mainnet`) |
+| `PREDICT_API_KEY` | Mainnet-authenticated predict.fun API access; required for mainnet market reads and trading |
 | `PREDICT_PRIVATE_KEY` | EOA trading and funding path |
 | `PREDICT_ACCOUNT_ADDRESS` | Predict Account smart-wallet address |
 | `PREDICT_PRIVY_PRIVATE_KEY` | Privy-exported signer for Predict Account mode |

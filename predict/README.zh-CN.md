@@ -67,14 +67,66 @@ SKILL frontmatter 的 metadata 里故意只声明通用入口变量：`PREDICT_E
 ## 首次配置（推荐）
 
 1. 安装 skill 并执行 `uv sync`。
-2. 在 `~/.openclaw/skills/predictclaw/` 中把 `.env.example` 复制为 `.env`。
-3. 只选择一种 wallet mode。
+2. 先选择一个启动模板：
+   - `.env.example` -> 无 secret 的本地 fixture 启动
+   - `.env.readonly.example` -> live 只读市场读取
+   - `.env.eoa.example` -> 直接私钥交易
+   - `.env.predict-account.example` -> Predict Account 交易
+   - `.env.mandated-vault.example` -> 高级 vault control-plane / overlay
+3. 在 `~/.openclaw/skills/predictclaw/` 中把选中的模板复制为 `.env`。
 4. 只填写该模式需要的最小变量集。
 5. 先用 `uv run python scripts/predictclaw.py --help` 确认安装无误。
 6. 再按模式做一次验证：
-   - `read-only` -> `uv run python scripts/predictclaw.py markets trending`
+   - fixture 启动 -> `uv run python scripts/predictclaw.py markets trending`
+   - live read-only -> `uv run python scripts/predictclaw.py markets trending`
    - `eoa` / `predict-account` -> `uv run python scripts/predictclaw.py wallet status --json`
    - `mandated-vault` -> `uv run python scripts/predictclaw.py wallet deposit --json`
+
+## 启动模板
+
+- `.env.example` -> 最安全的首装入口；使用 `test-fixture` + `read-only`，不需要 secrets，也不会访问网络
+- `.env.readonly.example` -> live 市场读取；mainnet 的市场读取需要 PREDICT_API_KEY
+- `.env.eoa.example` -> EOA signer 路线，从 `https://api-testnet.predict.fun` 的 testnet 起步
+- `.env.predict-account.example` -> Predict Account signer 路线，从 `https://api-testnet.predict.fun` 的 testnet 起步
+- `.env.mandated-vault.example` -> 高级显式 opt-in 的 vault control-plane 模板
+
+## 真实首装路径
+
+### A. 先确认 CLI 能启动
+
+```bash
+uv sync
+uv run python scripts/predictclaw.py --help
+```
+
+### B. 无 secret 的本地验证
+
+复制 `.env.example` 后运行：
+
+```bash
+uv run python scripts/predictclaw.py markets trending
+```
+
+这条路径使用 `test-fixture`，只证明 skill 能正确启动、加载配置并路由命令，不会访问 live API。
+fixture 模式只认识仓库自带的本地 market ID（`123`、`456`、`789`、`101`、`202`）。如果你要查询真实 market ID，请先切到 live read-only 模板。
+
+### C. live read-only 市场读取
+
+复制 `.env.readonly.example`，再根据目标环境二选一：
+
+- `mainnet` + 有效的 `PREDICT_API_KEY`，读取生产市场数据
+- `testnet` + `https://api-testnet.predict.fun`，做非 mainnet 的匿名市场读取
+
+```bash
+uv run python scripts/predictclaw.py markets trending
+uv run python scripts/predictclaw.py market <market_id> --json
+```
+
+如果 mainnet 读取返回 `401 unauthorized`，通常表示 `PREDICT_API_KEY` 缺失或无效。
+
+### D. signer 路线
+
+wallet status 需要 signer 配置。它适合 `eoa` 和 `predict-account` 的下一步验证，但不是 `read-only` 的第一条命令。
 
 ## 配置示例
 
@@ -82,21 +134,31 @@ SKILL frontmatter 的 metadata 里故意只声明通用入口变量：`PREDICT_E
 
 `OPENROUTER_API_KEY` 只在非 fixture 的 `hedge scan` / `hedge analyze` 中需要；market、wallet、buy 流程都不依赖它。
 
-### read-only 模式
+### bootstrap-safe fixture 模式
 
 ```dotenv
 PREDICT_ENV=test-fixture
 PREDICT_WALLET_MODE=read-only
 ```
 
-这个模式只适合浏览市场。需要执行 wallet / trade 子命令时，请切换到 `eoa`、`predict-account` 或 `mandated-vault`。
+这个模式只适合无 secret 的 CLI 验证与本地市场浏览，不会访问 live API。需要执行 wallet / trade 子命令时，请切换到 `eoa`、`predict-account` 或 `mandated-vault`。
+
+### live read-only 模式
+
+```dotenv
+PREDICT_ENV=mainnet
+PREDICT_WALLET_MODE=read-only
+PREDICT_API_KEY=YOUR_PREDICT_API_KEY
+```
+
+mainnet 的市场读取需要 PREDICT_API_KEY。如果你想做无 key 的非 mainnet 读取，请改用 `PREDICT_ENV=testnet`，并把 `PREDICT_API_BASE_URL` 设为 `https://api-testnet.predict.fun`。
 
 ### eoa 模式
 
 ```dotenv
 PREDICT_ENV=testnet
 PREDICT_WALLET_MODE=eoa
-PREDICT_API_BASE_URL=https://dev.predict.fun
+PREDICT_API_BASE_URL=https://api-testnet.predict.fun
 PREDICT_PRIVATE_KEY=0xYOUR_EOA_PRIVATE_KEY
 ```
 
@@ -105,7 +167,7 @@ PREDICT_PRIVATE_KEY=0xYOUR_EOA_PRIVATE_KEY
 ```dotenv
 PREDICT_ENV=testnet
 PREDICT_WALLET_MODE=predict-account
-PREDICT_API_BASE_URL=https://dev.predict.fun
+PREDICT_API_BASE_URL=https://api-testnet.predict.fun
 PREDICT_ACCOUNT_ADDRESS=0xYOUR_PREDICT_ACCOUNT
 PREDICT_PRIVY_PRIVATE_KEY=0xYOUR_PRIVY_EXPORTED_KEY
 ```
@@ -147,7 +209,7 @@ ERC_MANDATED_CHAIN_ID=97
 ```dotenv
 PREDICT_ENV=testnet
 PREDICT_WALLET_MODE=predict-account
-PREDICT_API_BASE_URL=https://dev.predict.fun
+PREDICT_API_BASE_URL=https://api-testnet.predict.fun
 PREDICT_ACCOUNT_ADDRESS=0xYOUR_PREDICT_ACCOUNT
 PREDICT_PRIVY_PRIVATE_KEY=0xYOUR_PRIVY_EXPORTED_KEY
 ERC_MANDATED_VAULT_ADDRESS=0xYOUR_DEPLOYED_VAULT
@@ -200,6 +262,9 @@ pure `mandated-vault` 不提供 predict.fun trading parity。`wallet approve`、
 ### 常见配置错误
 
 - `read-only` 只能浏览市场；不要直接跑 signer-backed 的 wallet / trade 命令。
+- `wallet status` 需要 signer 配置；在 `read-only` 下请先跑 `markets trending` 或 `market <id> --json`。
+- mainnet 的市场读取需要 `PREDICT_API_KEY`；没配会在配置阶段直接失败，配错通常会返回 `401 unauthorized`。
+- `testnet` 的市场读取应使用 `https://api-testnet.predict.fun`；旧的 `https://dev.predict.fun` 已不再匹配当前 API 合约。
 - `eoa` 必须配置 `PREDICT_PRIVATE_KEY`，并且不能混用 Predict Account 或 mandated-vault 输入。
 - `predict-account` 必须同时配置 `PREDICT_ACCOUNT_ADDRESS` 和 `PREDICT_PRIVY_PRIVATE_KEY`。
 - `mainnet` 必须配置 `PREDICT_API_KEY`。
@@ -257,19 +322,19 @@ uv run python scripts/predictclaw.py hedge analyze 101 202 --json
 
 ## 运行模式
 
-- `test-fixture` — 使用本地 JSON fixture 和确定性的 wallet / hedge / trade 行为，适合开发、集成测试与 CI。
-- `testnet` — 用于 live 但非 mainnet 的检查；如果目标端点是 `https://dev.predict.fun`，可通过 `PREDICT_API_BASE_URL` 或 `PREDICT_SMOKE_API_BASE_URL` 覆盖。
-- `mainnet` — 需要 `PREDICT_API_KEY`，应视为真实交易环境。
+- `test-fixture` — 使用本地 JSON fixture 和确定性的 wallet / hedge / trade 行为，适合开发、集成测试、CI，以及无 secret 的首装验证。
+- `testnet` — 用于 live 但非 mainnet 的检查；当前 REST 端点是 `https://api-testnet.predict.fun`，市场读取不需要 `PREDICT_API_KEY`。
+- `mainnet` — 需要 `PREDICT_API_KEY`，即使只是市场读取也应视为真实交易环境。
 
 ## 环境变量
 
 | 变量 | 作用 |
 | --- | --- |
 | `PREDICT_STORAGE_DIR` | 本地 journal 与持仓存储 |
-| `PREDICT_ENV` | 默认为 `testnet`；可选 `testnet`、`mainnet`、`test-fixture` |
+| `PREDICT_ENV` | 代码默认是 `testnet`；`.env.example` 刻意以 `test-fixture` 做 bootstrap；可选 `testnet`、`mainnet`、`test-fixture` |
 | `PREDICT_WALLET_MODE` | 显式模式覆盖：`read-only`、`eoa`、`predict-account`、`mandated-vault` |
-| `PREDICT_API_BASE_URL` | 可选 REST base override；留空时按环境自动选择（`testnet` / `test-fixture` -> `dev.predict.fun`，`mainnet` -> `api.predict.fun`） |
-| `PREDICT_API_KEY` | mainnet 认证后的 predict.fun API 访问 |
+| `PREDICT_API_BASE_URL` | 可选 REST base override；留空时按环境自动选择（`testnet` -> `api-testnet.predict.fun`，`test-fixture` -> 忽略，`mainnet` -> `api.predict.fun`） |
+| `PREDICT_API_KEY` | mainnet 认证后的 predict.fun API 访问；mainnet 市场读取与交易都需要它 |
 | `PREDICT_PRIVATE_KEY` | EOA 交易与资金路径 |
 | `PREDICT_ACCOUNT_ADDRESS` | Predict Account 智能钱包地址 |
 | `PREDICT_PRIVY_PRIVATE_KEY` | Predict Account 模式下的 Privy 导出 signer |
