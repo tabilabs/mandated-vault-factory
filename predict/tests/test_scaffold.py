@@ -10,6 +10,10 @@ REQUIRED_LAYOUT = {
     "pyproject.toml",
     ".gitignore",
     ".env.example",
+    ".env.readonly.example",
+    ".env.eoa.example",
+    ".env.predict-account.example",
+    ".env.mandated-vault.example",
     "README.md",
     "lib/__init__.py",
     "tests/conftest.py",
@@ -69,3 +73,15 @@ def test_env_example_contains_required_predict_keys() -> None:
 
     missing = sorted(REQUIRED_ENV_KEYS - keys)
     assert missing == []
+
+
+def test_default_env_example_is_bootstrap_safe_for_first_install() -> None:
+    predict_root = get_predict_root()
+    env_text = (predict_root / ".env.example").read_text()
+
+    assert "PREDICT_ENV=test-fixture" in env_text
+    assert "PREDICT_WALLET_MODE=read-only" in env_text
+    assert ".env.readonly.example" in env_text
+    assert ".env.eoa.example" in env_text
+    assert ".env.predict-account.example" in env_text
+    assert ".env.mandated-vault.example" in env_text
