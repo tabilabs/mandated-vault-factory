@@ -172,3 +172,19 @@ def test_docs_explain_first_install_bootstrap_layers() -> None:
     assert "wallet status 需要 signer 配置" in readme_zh
     assert "mainnet 的市场读取需要 PREDICT_API_KEY" in readme_zh
     assert ".env.example" not in readme_zh
+
+
+def test_docs_explain_predictclaw_version_source_of_truth() -> None:
+    predict_root = get_predict_root()
+    readme = (predict_root / "README.md").read_text()
+    skill = (predict_root / "SKILL.md").read_text()
+    readme_zh = (predict_root / "README.zh-CN.md").read_text()
+    root_readme = (predict_root.parent / "README.md").read_text()
+    onboarding = (predict_root.parent / "docs" / "onboarding.md").read_text()
+
+    for text in [readme, skill, root_readme, onboarding]:
+        assert "predict/pyproject.toml" in text
+        assert "repo root" in text.lower() or "repository root" in text.lower()
+
+    assert "predict/pyproject.toml" in readme_zh
+    assert "仓库根目录" in readme_zh
