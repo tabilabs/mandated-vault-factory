@@ -6,6 +6,8 @@ PredictClaw is the predict.fun-native OpenClaw skill for browsing markets, check
 
 This `predict/` directory is an isolated Python subproject inside `mandated-vault-factory`. It keeps its own CLI, runtime configuration, and tests without changing the repository's Foundry workflow.
 
+PredictClaw's version source of truth is `predict/pyproject.toml`. When checking GitHub or building from source, use the `predict/` subdirectory; the repository root is the Foundry workspace and does not define a PredictClaw `pyproject.toml`.
+
 ## What PredictClaw Is For
 
 PredictClaw gives OpenClaw a predictable command surface for predict.fun workflows:
