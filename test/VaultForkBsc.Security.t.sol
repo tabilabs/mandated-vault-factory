@@ -8,7 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {VaultFactory} from "../src/VaultFactory.sol";
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
-import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../src/interfaces/IERC8192MandatedVault.sol";
 
 import {BSC_CHAIN_ID, BSC_BUSD} from "./helpers/BscForkConstants.sol";
 import {MerkleHelper} from "./helpers/MerkleHelper.sol";
@@ -62,7 +62,8 @@ contract VaultForkBscSecurityTest is Test {
         if (vm.envExists("BSC_FORK_BLOCK")) {
             uint256 forkBlock = vm.envUint("BSC_FORK_BLOCK");
             if (block.number != forkBlock) {
-                try vm.rollFork(forkBlock) {} catch {
+                try vm.rollFork(forkBlock) {}
+                catch {
                     vm.skip(true, "failed to roll fork to BSC_FORK_BLOCK");
                     return;
                 }
@@ -84,13 +85,14 @@ contract VaultForkBscSecurityTest is Test {
         uint256 drainAmount = 60e18; // 6% > 5%
         deal(BSC_BUSD, address(v), initialAssets);
 
-        (bytes32 root, bytes32[] memory tokenProof, bytes32[] memory adapterProof) = _rootForPair(BSC_BUSD, address(burnAdapter));
+        (bytes32 root, bytes32[] memory tokenProof, bytes32[] memory adapterProof) =
+            _rootForPair(BSC_BUSD, address(burnAdapter));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(
             BSC_BUSD, 0, abi.encodeCall(IERC20.approve, (address(burnAdapter), drainAmount))
         );
-        actions[1] = IERCXXXXMandatedVault.Action(
+        actions[1] = IERC8192MandatedVault.Action(
             address(burnAdapter),
             0,
             abi.encodeCall(SecurityBurnAssetAdapter.pullFromCaller, (BSC_BUSD, address(0xDEAD), drainAmount))
@@ -100,13 +102,13 @@ contract VaultForkBscSecurityTest is Test {
         proofs[0] = tokenProof;
         proofs[1] = adapterProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _buildMandate(v, _nextNonce(), root, 500, 1000);
+        IERC8192MandatedVault.Mandate memory m = _buildMandate(v, _nextNonce(), root, 500, 1000);
         (bool ok, bytes memory ret) = _execRaw(v, m, actions, proofs);
 
         assertTrue(!ok, "expected revert");
         bytes4 sel = _revertSelector(ret);
-        assertTrue(sel != IERCXXXXMandatedVault.ActionCallFailed.selector, "unexpected ActionCallFailed");
-        assertEq(sel, IERCXXXXMandatedVault.DrawdownExceeded.selector, "unexpected revert selector");
+        assertTrue(sel != IERC8192MandatedVault.ActionCallFailed.selector, "unexpected ActionCallFailed");
+        assertEq(sel, IERC8192MandatedVault.DrawdownExceeded.selector, "unexpected revert selector");
     }
 
     function test_bscFork_us08_drawdownBreaker_revertCumulativeDrawdownExceeded_postExecutionDirect() public {
@@ -114,15 +116,16 @@ contract VaultForkBscSecurityTest is Test {
         uint256 initialAssets = 1_000e18;
         deal(BSC_BUSD, address(v), initialAssets);
 
-        (bytes32 root, bytes32[] memory tokenProof, bytes32[] memory adapterProof) = _rootForPair(BSC_BUSD, address(burnAdapter));
+        (bytes32 root, bytes32[] memory tokenProof, bytes32[] memory adapterProof) =
+            _rootForPair(BSC_BUSD, address(burnAdapter));
 
         // first: 4% loss, should pass
         {
-            IERCXXXXMandatedVault.Action[] memory actions1 = new IERCXXXXMandatedVault.Action[](2);
-            actions1[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions1 = new IERC8192MandatedVault.Action[](2);
+            actions1[0] = IERC8192MandatedVault.Action(
                 BSC_BUSD, 0, abi.encodeCall(IERC20.approve, (address(burnAdapter), 40e18))
             );
-            actions1[1] = IERCXXXXMandatedVault.Action(
+            actions1[1] = IERC8192MandatedVault.Action(
                 address(burnAdapter),
                 0,
                 abi.encodeCall(SecurityBurnAssetAdapter.pullFromCaller, (BSC_BUSD, address(0xDEAD), 40e18))
@@ -132,7 +135,7 @@ contract VaultForkBscSecurityTest is Test {
             proofs1[0] = tokenProof;
             proofs1[1] = adapterProof;
 
-            IERCXXXXMandatedVault.Mandate memory m1 = _buildMandate(v, _nextNonce(), root, 800, 1000);
+            IERC8192MandatedVault.Mandate memory m1 = _buildMandate(v, _nextNonce(), root, 800, 1000);
             (uint256 pre1, uint256 post1) = _exec(v, m1, actions1, proofs1);
             assertEq(pre1, 1_000e18, "unexpected preAssets");
             assertEq(post1, 960e18, "unexpected postAssets");
@@ -140,11 +143,11 @@ contract VaultForkBscSecurityTest is Test {
 
         // second: single loss 70/960 = 7.29% (<8%), cumulative loss 110/1000 = 11% (>10%)
         {
-            IERCXXXXMandatedVault.Action[] memory actions2 = new IERCXXXXMandatedVault.Action[](2);
-            actions2[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions2 = new IERC8192MandatedVault.Action[](2);
+            actions2[0] = IERC8192MandatedVault.Action(
                 BSC_BUSD, 0, abi.encodeCall(IERC20.approve, (address(burnAdapter), 70e18))
             );
-            actions2[1] = IERCXXXXMandatedVault.Action(
+            actions2[1] = IERC8192MandatedVault.Action(
                 address(burnAdapter),
                 0,
                 abi.encodeCall(SecurityBurnAssetAdapter.pullFromCaller, (BSC_BUSD, address(0xDEAD), 70e18))
@@ -154,13 +157,13 @@ contract VaultForkBscSecurityTest is Test {
             proofs2[0] = tokenProof;
             proofs2[1] = adapterProof;
 
-            IERCXXXXMandatedVault.Mandate memory m2 = _buildMandate(v, _nextNonce(), root, 800, 1000);
+            IERC8192MandatedVault.Mandate memory m2 = _buildMandate(v, _nextNonce(), root, 800, 1000);
             (bool ok, bytes memory ret) = _execRaw(v, m2, actions2, proofs2);
 
             assertTrue(!ok, "expected revert");
             bytes4 sel = _revertSelector(ret);
-            assertTrue(sel != IERCXXXXMandatedVault.ActionCallFailed.selector, "unexpected ActionCallFailed");
-            assertEq(sel, IERCXXXXMandatedVault.CumulativeDrawdownExceeded.selector, "unexpected revert selector");
+            assertTrue(sel != IERC8192MandatedVault.ActionCallFailed.selector, "unexpected ActionCallFailed");
+            assertEq(sel, IERC8192MandatedVault.CumulativeDrawdownExceeded.selector, "unexpected revert selector");
         }
     }
 
@@ -169,18 +172,18 @@ contract VaultForkBscSecurityTest is Test {
 
         bytes32 root = _leaf(address(noopAdapter));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(SecurityNoopAdapter.nop, ()));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(SecurityNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
         uint256 nonce = _nextNonce();
-        IERCXXXXMandatedVault.Mandate memory m = _buildMandate(v, nonce, root, 500, 1000);
+        IERC8192MandatedVault.Mandate memory m = _buildMandate(v, nonce, root, 500, 1000);
         _exec(v, m, actions, proofs);
 
         bytes memory sig = _sign(v, m);
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.NonceAlreadyUsed.selector);
+        vm.expectRevert(IERC8192MandatedVault.NonceAlreadyUsed.selector);
         v.execute(m, actions, sig, proofs, "");
     }
 
@@ -192,16 +195,16 @@ contract VaultForkBscSecurityTest is Test {
 
         bytes32 root = _leaf(address(noopAdapter));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(SecurityNoopAdapter.nop, ()));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(SecurityNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
-        IERCXXXXMandatedVault.Mandate memory m = _buildMandate(v, 9, root, 500, 1000);
+        IERC8192MandatedVault.Mandate memory m = _buildMandate(v, 9, root, 500, 1000);
         bytes memory sig = _sign(v, m);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.NonceBelowThreshold.selector);
+        vm.expectRevert(IERC8192MandatedVault.NonceBelowThreshold.selector);
         v.execute(m, actions, sig, proofs, "");
     }
 
@@ -210,12 +213,12 @@ contract VaultForkBscSecurityTest is Test {
 
         bytes32 root = _leaf(address(noopAdapter));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(SecurityNoopAdapter.nop, ()));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(SecurityNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
-        IERCXXXXMandatedVault.Mandate memory m = _buildMandate(v, _nextNonce(), root, 500, 1000);
+        IERC8192MandatedVault.Mandate memory m = _buildMandate(v, _nextNonce(), root, 500, 1000);
         bytes32 mandateHash = v.hashMandate(m);
 
         vm.prank(authority);
@@ -223,7 +226,7 @@ contract VaultForkBscSecurityTest is Test {
 
         bytes memory sig = _sign(v, m);
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.MandateIsRevoked.selector);
+        vm.expectRevert(IERC8192MandatedVault.MandateIsRevoked.selector);
         v.execute(m, actions, sig, proofs, "");
     }
 
@@ -232,12 +235,12 @@ contract VaultForkBscSecurityTest is Test {
 
         bytes32 root = _leaf(address(noopAdapter));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(SecurityNoopAdapter.nop, ()));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(SecurityNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
-        IERCXXXXMandatedVault.Mandate memory oldMandate = _buildMandate(v, _nextNonce(), root, 500, 1000);
+        IERC8192MandatedVault.Mandate memory oldMandate = _buildMandate(v, _nextNonce(), root, 500, 1000);
         bytes memory oldSig = _sign(v, oldMandate);
 
         address newAuthority = address(0xBEEF);
@@ -250,7 +253,7 @@ contract VaultForkBscSecurityTest is Test {
         assertEq(v.authorityEpoch(), oldMandate.authorityEpoch + 1, "authority epoch should increment");
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.AuthorityEpochMismatch.selector);
+        vm.expectRevert(IERC8192MandatedVault.AuthorityEpochMismatch.selector);
         v.execute(oldMandate, actions, oldSig, proofs, "");
     }
 
@@ -265,7 +268,7 @@ contract VaultForkBscSecurityTest is Test {
         );
     }
 
-    function _sign(MandatedVaultClone v, IERCXXXXMandatedVault.Mandate memory m) internal view returns (bytes memory) {
+    function _sign(MandatedVaultClone v, IERC8192MandatedVault.Mandate memory m) internal view returns (bytes memory) {
         (uint8 vv, bytes32 r, bytes32 s) = vm.sign(authorityKey, v.hashMandate(m));
         return abi.encodePacked(r, s, vv);
     }
@@ -282,12 +285,14 @@ contract VaultForkBscSecurityTest is Test {
         return MerkleHelper.buildTree2(_leaf(first), _leaf(second));
     }
 
-    function _buildMandate(MandatedVaultClone v, uint256 nonce, bytes32 root, uint16 maxSingleBps, uint16 maxCumulativeBps)
-        internal
-        view
-        returns (IERCXXXXMandatedVault.Mandate memory)
-    {
-        return IERCXXXXMandatedVault.Mandate({
+    function _buildMandate(
+        MandatedVaultClone v,
+        uint256 nonce,
+        bytes32 root,
+        uint16 maxSingleBps,
+        uint16 maxCumulativeBps
+    ) internal view returns (IERC8192MandatedVault.Mandate memory) {
+        return IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: nonce,
             deadline: 0,
@@ -302,8 +307,8 @@ contract VaultForkBscSecurityTest is Test {
 
     function _exec(
         MandatedVaultClone v,
-        IERCXXXXMandatedVault.Mandate memory m,
-        IERCXXXXMandatedVault.Action[] memory actions,
+        IERC8192MandatedVault.Mandate memory m,
+        IERC8192MandatedVault.Action[] memory actions,
         bytes32[][] memory proofs
     ) internal returns (uint256 pre, uint256 post) {
         bytes memory sig = _sign(v, m);
@@ -313,8 +318,8 @@ contract VaultForkBscSecurityTest is Test {
 
     function _execRaw(
         MandatedVaultClone v,
-        IERCXXXXMandatedVault.Mandate memory m,
-        IERCXXXXMandatedVault.Action[] memory actions,
+        IERC8192MandatedVault.Mandate memory m,
+        IERC8192MandatedVault.Action[] memory actions,
         bytes32[][] memory proofs
     ) internal returns (bool ok, bytes memory ret) {
         bytes memory sig = _sign(v, m);

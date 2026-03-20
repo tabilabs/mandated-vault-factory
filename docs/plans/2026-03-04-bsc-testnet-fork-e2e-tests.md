@@ -2,44 +2,44 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 为已部署在 BSC Testnet chainId=97 的 VaultFactory/VenusAdapter/PancakeSwapV3Adapter 提供 fork-based E2E 测试：Layer A 在 fork 上本地部署合约做主覆盖；Layer B 直接对已部署合约做一致性校验 + 最小 smoke（Venus+Pancake），并采用“默认 fork 到最新 head，可选 env 固定 block”的策略。
+**Goal:** Provide fork-based E2E coverage for the deployed `VaultFactory`, `VenusAdapter`, and `PancakeSwapV3Adapter` on BSC Testnet (`chainId=97`). Layer A performs the primary coverage with contracts deployed locally on top of the fork. Layer B validates the already deployed contracts for consistency and runs a minimal smoke path (`Venus + Pancake`), using a head-first strategy by default with optional env-based block pinning.
 
-**Architecture:** 测试分两层：Layer A 复用现有 `test/VaultForkBsc.*.t.sol` 基座与 helpers，覆盖核心业务与安全语义；Layer B 读取 `deployments/bsc-testnet.json`，在 fork head 上验证链上 code/codehash/leaf 与记录一致，并用链上 factory 做最小 smoke。对外部协议波动（Venus/Pancake）采用“协议不可用则 skip、非协议问题则 fail”的分诊策略，避免假绿。
+**Architecture:** The test stack is split into two layers. Layer A reuses the existing `test/VaultForkBsc.*.t.sol` base contracts and helpers to cover core business logic and security semantics. Layer B reads `deployments/bsc-testnet.json`, validates that on-chain code/codehash/leaf values match the recorded deployment data at fork head, and runs a minimal smoke path via the deployed factory. External protocol volatility (`Venus` / `Pancake`) uses a triage rule: `skip` when the protocol is unavailable, `fail` for non-protocol issues.
 
-**Tech Stack:** Foundry (forge-std Test + cheatcodes), Solidity 0.8.28, OpenZeppelin, `forge-std/StdJson` JSON 解析。
-
----
-
-## 0. 约束与前置约定
-
-1. 默认 fork 到最新 head
-- 不强制 roll 到常量区块。
-- 仅当设置了 `BSC_FORK_BLOCK` 环境变量时，才尝试 `vm.rollFork(BSC_FORK_BLOCK)`。
-- 若 roll 失败，使用 `vm.skip(true, reason)`，并在 reason 中打印 block 号与建议。
-
-2. 两层测试职责边界
-- Layer A 本地部署到 fork：语义与安全、失败模式尽量确定性覆盖。
-- Layer B 链上已部署合约：部署一致性校验 + 最小 smoke，不强求完整协议路径。
-
-3. 关于 ActionCallFailed 包装
-- 外部协议或 adapter 内部 revert 往往会被 `MandatedVaultClone` 包装成 `IERCXXXXMandatedVault.ActionCallFailed(index, reason)`。
-- 测试必须区分：vault 自身校验（直接 revert） vs action 执行失败（ActionCallFailed）。
+**Tech Stack:** Foundry (`forge-std` Test + cheatcodes), Solidity `0.8.28`, OpenZeppelin, `forge-std/StdJson` for JSON parsing.
 
 ---
 
-## Task 1: 调整 BSC fork 基座，默认使用最新 head（可选固定 block）
+## 0. Constraints and Preconditions
 
-**Files:**
+1. Default to fork head
+- Do not force a rollback to a fixed block.
+- Only call `vm.rollFork(BSC_FORK_BLOCK)` when the `BSC_FORK_BLOCK` environment variable is set.
+- If the rollback fails, use `vm.skip(true, reason)` and include the block number plus an operator-facing hint in the skip reason.
+
+2. Layer responsibilities
+- Layer A deploys locally on top of the fork and aims for deterministic coverage of semantics, security, and failure modes.
+- Layer B targets already deployed on-chain contracts and focuses on deployment consistency plus a minimal smoke path rather than exhaustive protocol-path coverage.
+
+3. About `ActionCallFailed` wrapping
+- Reverts from external protocols or inside adapters are often wrapped by `MandatedVaultClone` as `IERC8192MandatedVault.ActionCallFailed(index, reason)`.
+- Tests must distinguish between vault-native validation failures (direct revert) and action-execution failures (`ActionCallFailed`).
+
+---
+
+## Task 1: Update the BSC Fork Base to Default to Head (Optional Block Pinning)
+
+ **Files:**
 - Modify: `test/VaultForkBsc.Base.t.sol`
 
 **Steps:**
-1. 新增 guard 测试：当未设置 `BSC_FORK_BLOCK` 时，不会强制 roll。
-2. 修改 `setUp()`：只在 env 存在时 `vm.rollFork`；失败则 skip。
-3. 运行 fork 测试集确认通过。
+1. Add a guard test proving that the suite does not force a rollback when `BSC_FORK_BLOCK` is unset.
+2. Update `setUp()` so `vm.rollFork` runs only when the env var exists; if it fails, skip the suite.
+3. Run the fork suite and confirm that it passes.
 
 ---
 
-## Task 2: Layer A — 用户故事驱动测试（本地部署到 fork）
+## Task 2: Layer A — User-Story-Driven Tests (Local Deployment on Fork)
 
 **Files:**
 - Create: `test/VaultForkBsc.Security.t.sol`
@@ -57,7 +57,7 @@
 
 ---
 
-## Task 3: Layer B — 部署一致性校验 + 最小 smoke
+## Task 3: Layer B — Deployment Consistency Validation + Minimal Smoke
 
 **Files:**
 - Create: `test/helpers/BscTestnetDeploymentJson.sol`
@@ -66,43 +66,43 @@
 - Modify: `foundry.toml`
 
 **Acceptance Criteria:**
-1. `deployments/bsc-testnet.json` 填充真实值：
-- factory 地址
-- adapters 地址
-- adapterCodehashes 与 adapterLeaves
+1. `deployments/bsc-testnet.json` is filled with real values for:
+- factory address
+- adapter addresses
+- adapter codehashes and adapter leaves
 
-2. `foundry.toml` 配置最小 `fs_permissions`：read-only + `./deployments`。
+2. `foundry.toml` grants minimal `fs_permissions`: read-only access to `./deployments`.
 
-3. 测试在 fork head 可跑：
-- 静态一致性：adapter code/codehash/leaf match json。
-- 最小 smoke：使用已部署 `VaultFactory` 做 `predictVaultAddress == createVault`，并断言 vault 有 code。
+3. Tests run successfully at fork head:
+- static consistency: adapter code/codehash/leaf values match the JSON record
+- minimal smoke: the deployed `VaultFactory` satisfies `predictVaultAddress == createVault`, and the created vault has runtime code
 
 ---
 
-## Task 4: 文档与运行指南更新
+## Task 4: Update Documentation and Run Guidance
 
 **Files:**
 - Modify: `docs/e2e-fork-user-stories.md`
 
 **Steps:**
-1. 补充运行命令：head 默认策略 + `BSC_FORK_BLOCK` 固定复现。
-2. 增加 fork infra 常见失败提示（missing trie node、RPC 限流）。
+1. Add runnable commands for both the default head-first strategy and `BSC_FORK_BLOCK`-based reproduction.
+2. Add troubleshooting guidance for common fork infra failures such as `missing trie node` and RPC rate limits.
 
 ---
 
-## Task 5: 验证与质量门槛
+## Task 5: Validation and Quality Gates
 
-1) 全量 BSC fork head 模式：
+1) Full BSC fork run in head mode:
 
 ```
 forge test --match-test '^test_bscFork_' --fork-url "$BSC_RPC_URL"
 ```
 
-预期：
-- Layer A 语义与安全测试 PASS。
-- Venus/Pancake 若协议不可用，按分诊逻辑 skip。
+Expected result:
+- Layer A semantic and security tests pass.
+- If Venus or Pancake is unavailable, the suite skips according to the triage rules.
 
-2) Layer B deployed consistency：
+2) Layer B deployed consistency:
 
 ```
 forge test --match-path test/VaultForkBsc.DeployedConsistency.t.sol --fork-url "$BSC_RPC_URL"
@@ -110,4 +110,4 @@ forge test --match-path test/VaultForkBsc.DeployedConsistency.t.sol --fork-url "
 
 ---
 
-<!-- 本计划文件是为了补齐 docs/plans 目录缺失而回填；执行记录与代码状态以仓库实际变更为准。 -->
+<!-- This plan file was backfilled to restore missing `docs/plans` coverage. The actual implementation record and code status are defined by the repository state. -->

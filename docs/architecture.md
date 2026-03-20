@@ -58,7 +58,7 @@ classDiagram
       -_computeSalt(...)
     }
 
-    class IERCXXXXMandatedVault {
+    class IERC8192MandatedVault {
       <<interface>>
       +execute(...)
       +hashMandate(...)
@@ -100,7 +100,7 @@ classDiagram
     }
 
     IVaultFactory <|.. VaultFactory
-    IERCXXXXMandatedVault <|.. MandatedVaultClone
+    IERC8192MandatedVault <|.. MandatedVaultClone
     VaultFactory --> MandatedVaultClone : clone + initialize
     MandatedVaultClone ..> MandateLib : field/payload checks
     MandatedVaultClone ..> AdapterLib : adapter/selector allowlists
@@ -141,7 +141,7 @@ flowchart TD
 - `src/VaultFactory.sol`
 - `src/interfaces/IVaultFactory.sol`
 - `src/MandatedVaultClone.sol`
-- `src/interfaces/IERCXXXXMandatedVault.sol`
+- `src/interfaces/IERC8192MandatedVault.sol`
 - `src/libs/MandateLib.sol`
 - `src/libs/AdapterLib.sol`
 - `src/libs/DrawdownLib.sol`

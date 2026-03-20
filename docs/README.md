@@ -5,4 +5,5 @@
 - [Contributor Onboarding](./onboarding.md)
 - [User Stories](./user-stories.md)
 - [E2E Fork User Stories](./e2e-fork-user-stories.md)
+- [BSC Mainnet Deployment Runbook](./bsc-mainnet-deployment-runbook.md)
 - [BSC Testnet Fork Test Plan (2026-03-03)](../../erc-mandated-execution/docs/planning/mandated-vault-factory/2026-03-03_BSC-Testnet-Fork-Test-Plan.md)

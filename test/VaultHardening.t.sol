@@ -6,7 +6,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {VaultFactory} from "../src/VaultFactory.sol";
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
-import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../src/interfaces/IERC8192MandatedVault.sol";
 import {MockAdapter} from "../src/mocks/MockAdapter.sol";
 import {GasBurningAdapter} from "../src/mocks/MockAdapter.sol";
 import {VaultBusyAttackAdapter} from "../src/mocks/MockAdapter.sol";
@@ -53,9 +53,9 @@ contract VaultHardeningTest is Test {
     function _mandate(MandatedVaultClone v, uint256 nonce, bytes32 root, bytes memory extensions)
         internal
         view
-        returns (IERCXXXXMandatedVault.Mandate memory)
+        returns (IERC8192MandatedVault.Mandate memory)
     {
-        return IERCXXXXMandatedVault.Mandate({
+        return IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: nonce,
             deadline: 0,
@@ -68,7 +68,7 @@ contract VaultHardeningTest is Test {
         });
     }
 
-    function _sign(MandatedVaultClone v, IERCXXXXMandatedVault.Mandate memory m) internal view returns (bytes memory) {
+    function _sign(MandatedVaultClone v, IERC8192MandatedVault.Mandate memory m) internal view returns (bytes memory) {
         (uint8 vv, bytes32 r, bytes32 s) = vm.sign(authorityKey, v.hashMandate(m));
         return abi.encodePacked(r, s, vv);
     }
@@ -86,14 +86,14 @@ contract VaultHardeningTest is Test {
     function test_execute_optionalUnknownExtension_succeeds() public {
         MandatedVaultClone v = _createVault();
 
-        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](1);
-        exts[0] = IERCXXXXMandatedVault.Extension(bytes4(0xabcdef01), false, bytes(""));
+        IERC8192MandatedVault.Extension[] memory exts = new IERC8192MandatedVault.Extension[](1);
+        exts[0] = IERC8192MandatedVault.Extension(bytes4(0xabcdef01), false, bytes(""));
         bytes memory extensions = abi.encode(exts);
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(address(adapter), 0, abi.encodeCall(MockAdapter.doNothing, ()));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(address(adapter), 0, abi.encodeCall(MockAdapter.doNothing, ()));
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, 0, _singleLeafRoot(address(adapter)), extensions);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, 0, _singleLeafRoot(address(adapter)), extensions);
         bytes memory sig = _sign(v, m);
 
         vm.prank(executor);
@@ -112,8 +112,8 @@ contract VaultHardeningTest is Test {
     function test_vaultBusy_mintDuringExecute() public {
         MandatedVaultClone v = _createVault();
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(
             address(busyAttacker), 0, abi.encodeCall(VaultBusyAttackAdapter.tryMint, (address(v), 1e18))
         );
 
@@ -123,8 +123,8 @@ contract VaultHardeningTest is Test {
     function test_vaultBusy_withdrawDuringExecute() public {
         MandatedVaultClone v = _createVault();
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(
             address(busyAttacker), 0, abi.encodeCall(VaultBusyAttackAdapter.tryWithdraw, (address(v), 1e18))
         );
 
@@ -134,8 +134,8 @@ contract VaultHardeningTest is Test {
     function test_vaultBusy_redeemDuringExecute() public {
         MandatedVaultClone v = _createVault();
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(
             address(busyAttacker), 0, abi.encodeCall(VaultBusyAttackAdapter.tryRedeem, (address(v), 1e18))
         );
 
@@ -144,11 +144,11 @@ contract VaultHardeningTest is Test {
 
     function _expectVaultBusyInner(
         MandatedVaultClone v,
-        IERCXXXXMandatedVault.Action[] memory actions,
+        IERC8192MandatedVault.Action[] memory actions,
         bytes32 root,
         uint256 expectedActionIndex
     ) internal {
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, 0, root, "");
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, 0, root, "");
         bytes memory sig = _sign(v, m);
 
         vm.prank(executor);
@@ -156,11 +156,11 @@ contract VaultHardeningTest is Test {
             revert("expected revert");
         } catch (bytes memory revertData) {
             assertGt(revertData.length, 4, "revert data too short");
-            assertEq(bytes4(revertData), IERCXXXXMandatedVault.ActionCallFailed.selector, "wrong outer selector");
+            assertEq(bytes4(revertData), IERC8192MandatedVault.ActionCallFailed.selector, "wrong outer selector");
 
             (uint256 actionIndex, bytes memory innerReason) = abi.decode(_stripSelector(revertData), (uint256, bytes));
             assertEq(actionIndex, expectedActionIndex, "wrong action index");
-            assertEq(bytes4(innerReason), IERCXXXXMandatedVault.VaultBusy.selector, "inner reason should be VaultBusy");
+            assertEq(bytes4(innerReason), IERC8192MandatedVault.VaultBusy.selector, "inner reason should be VaultBusy");
         }
     }
 
@@ -168,12 +168,12 @@ contract VaultHardeningTest is Test {
         internal
         returns (uint256 gasSpent)
     {
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(
             address(gasBurner), 0, abi.encodeCall(GasBurningAdapter.burnGasAndRevert, (loops))
         );
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, _singleLeafRoot(address(gasBurner)), "");
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, _singleLeafRoot(address(gasBurner)), "");
         bytes memory sig = _sign(v, m);
 
         vm.prank(executor);
@@ -182,7 +182,7 @@ contract VaultHardeningTest is Test {
             revert("expected revert");
         } catch (bytes memory revertData) {
             assertGt(revertData.length, 4, "revert data too short");
-            assertEq(bytes4(revertData), IERCXXXXMandatedVault.ActionCallFailed.selector, "wrong selector");
+            assertEq(bytes4(revertData), IERC8192MandatedVault.ActionCallFailed.selector, "wrong selector");
         }
         gasSpent = beforeGas - gasleft();
     }

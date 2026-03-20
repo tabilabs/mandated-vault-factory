@@ -1,0 +1,56 @@
+{
+  "chainId": 56,
+  "network": "bsc-mainnet",
+  "snapshotDate": "2026-03-12",
+  "factory": "0x6eFC613Ece5D95e4a7b69B4EddD332CeeCbb61c6",
+  "factoryCodehash": "0x65ab0f2dbcf6a779f20334d8fa021e76427ddf00860e39a01e918c947ebe6686",
+  "factoryLeaf": "0x8ba73e53f8b10e916f4c6c142d1b3a2533b6e6770d6c9ca1cf45a729fd528ecf",
+  "adapters": {
+    "venus": "0xB81966a4E1348D29102a6D76f714Bb3bf17C507e",
+    "pancakeswap": "0xDEb8deAB9E7F9068DE84A20E75A2A5165a4F2f75"
+  },
+  "adapterCodehashes": {
+    "venus": "0x946e8ed778fb7e7180828565786e77e4e6bee90d7c1c1eed548a7b58c301c342",
+    "pancakeswap": "0x7303136835102414cf2a23b19ebf7164f1180f5a24f404e3a77af6ac25a67a7d"
+  },
+  "adapterLeaves": {
+    "venus": "0x51b55f3c05f7e1e22fd6369b65d55b0447dd26566c82de0538b025cbf9524b2f",
+    "pancakeswap": "0x40c37148810fdde6122aa5168434943013d87eb2fde35e78fb7adc0d7ecdff6d"
+  },
+  "protocols": {
+    "venus": {
+      "source": "https://docs-v4.venus.io/deployed-contracts/markets",
+      "comptroller": "0xfD36E2c2a6789Db23113685031d7F16329158384",
+      "vBUSD": "0x95c78222B3D6e262426483D42CfA53685A67Ab9D",
+      "vUSDT": "0xfD5840Cd36d94D7229439859C0112a4185BC0255",
+      "status": "official-address-verified"
+    },
+    "pancakeswap": {
+      "source": "https://developer.pancakeswap.finance/contracts/v3/addresses",
+      "swapRouterV3": "0x1b81D678ffb9C0263b24A97847620C99d213eB14",
+      "v3Factory": "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
+      "quoterV2": "0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997",
+      "status": "official-address-verified"
+    }
+  },
+  "tokens": {
+    "source": "https://docs-v4.venus.io/deployed-contracts/markets",
+    "BUSD": "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56",
+    "USDT": "0x55d398326f99059fF775485246999027B3197955",
+    "WBNB": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    "scopeStatus": "parity-candidate-not-launch-approved"
+  },
+  "notes": {
+    "protocolAnchors": "verified-from-official-sources",
+    "projectDeployments": "deployed-on-bsc-mainnet-2026-03-12",
+    "launchScope": "human-review-required-for-token-and-protocol-scope",
+    "deployer": "0x634664a61906F7f1a2bD115BDdd4d596917Bda0C",
+    "deployedAt": "2026-03-12T07:22:10Z",
+    "factoryImplementation": "0x64b40cB0C5F63EfC15f4fDC9A7f272BA82414cca",
+    "deploymentTxs": {
+      "factory": "0x52ae84aeefbc9be6500640647b32416a362cabb2417ebca549f05e7a54647a0c",
+      "venusAdapter": "0xdbe0604d2a2937b33319e9f356a9f126c21b4d2a3ce7c1975c7cef9e51ed1cae",
+      "pancakeSwapV3Adapter": "0xf1475dea00e5808625ad542c680262ebbe388cb816322efb22f1887bf0c002b2"
+    }
+  }
+}

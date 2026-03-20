@@ -73,28 +73,28 @@ forge test
 
 ---
 
-## 如何运行 BSC Fork 测试
+## How to Run BSC Fork Tests
 
-### 默认策略：使用 fork head
+### Default Strategy: Run Against Fork Head
 
-BSC fork 测试默认以当前 provider 的最新区块 head 运行，不强制回滚到固定历史块。
+BSC fork tests run against the latest block from the configured provider by default. They do not force a rollback to a fixed historical block unless explicitly requested.
 
-原因：
+Why this is the default:
 
-1. 公共 BSC RPC 经常不保留完整历史状态，强制回滚历史块容易出现基础设施错误（例如 `missing trie node`）。
-2. Venus 和 Pancake 在测试网状态会持续变化，head 模式更贴近“当前已部署现实”，适合 smoke 与回归。
-3. 当需要复现时，再通过环境变量显式固定 `BSC_FORK_BLOCK`，避免默认路径被历史状态可用性影响。
+1. Public BSC RPC providers often do not retain complete historical state, so forcing an older block frequently causes infra-level failures such as `missing trie node`.
+2. Venus and Pancake state changes continuously on testnet, so head mode is closer to the currently deployed reality and is better suited for smoke and regression coverage.
+3. When reproducibility is required, pin `BSC_FORK_BLOCK` explicitly instead of making the default path depend on historical-state availability.
 
-### 可复制命令
+### Copy-Paste Commands
 
-仅运行 BSC fork 测试（默认 head）：
+Run only BSC fork tests in head mode:
 
 ```
 BSC_RPC_URL=<your-bsc-testnet-rpc> \
 forge test --match-test '^test_bscFork_' --fork-url "$BSC_RPC_URL" --chain-id 97
 ```
 
-固定区块复现（可选 `BSC_FORK_BLOCK`）：
+Reproduce with a pinned block (`BSC_FORK_BLOCK` is optional but recommended):
 
 ```
 BSC_RPC_URL=<your-bsc-testnet-rpc> \
@@ -102,7 +102,7 @@ BSC_FORK_BLOCK=93533855 \
 forge test --match-test '^test_bscFork_' --fork-url "$BSC_RPC_URL" --chain-id 97
 ```
 
-固定区块并要求启动即在该块（更严格复现）：
+Start the fork directly from the pinned block for stricter reproduction:
 
 ```
 BSC_RPC_URL=<your-bsc-testnet-rpc> \
@@ -110,19 +110,92 @@ BSC_FORK_BLOCK=93533855 \
 forge test --match-test '^test_bscFork_' --fork-url "$BSC_RPC_URL" --fork-block-number "$BSC_FORK_BLOCK" --chain-id 97
 ```
 
-### 失败排查与 RPC 建议
+### Troubleshooting and RPC Guidance
 
-如果出现以下现象：
+If you see any of the following:
 
 - `missing trie node`
 - `header not found`
-- 在固定块模式下频繁 `failed to roll fork to BSC_FORK_BLOCK`
+- frequent `failed to roll fork to BSC_FORK_BLOCK` errors in pinned-block mode
 
-优先按顺序处理：
+work through the following in order:
 
-1. 先去掉 `BSC_FORK_BLOCK`，确认默认 head 模式可运行。
-2. 替换为稳定性更高的 BSC testnet RPC（优先付费/归档节点）。
-3. 如需固定块复现，使用支持历史状态查询的 RPC，再重新执行固定块命令。
+1. Remove `BSC_FORK_BLOCK` first and confirm that default head mode succeeds.
+2. Switch to a more reliable BSC testnet RPC, ideally a paid or archive-capable provider.
+3. If you still need pinned-block reproduction, use an RPC that supports historical state queries and rerun the pinned-block command.
+
+---
+
+## How to Run Base Fork Tests
+
+Base fork coverage is now organized into four layers:
+
+1. Protocol anchor validation
+   - Verifies that official protocol addresses exist on-chain and match their expected relationships.
+   - Does not depend on this project's own Base mainnet deployment record.
+   - Also checks that:
+     - the Uniswap `USDC/WETH` 0.05% pool exists
+     - `QuoterV2` returns a non-zero quote
+     - Aerodrome `weth()` is wired correctly
+     - Morpho `owner()` is non-zero
+
+2. Deployed consistency validation
+   - Depends on `factory`, `adapters`, `codehash`, and `leaf` entries in `deployments/base-mainnet.json`.
+   - If those fields are still placeholders or incomplete, the test explicitly `skip`s instead of producing a false failure.
+
+3. Live protocol smoke tests
+   - Deposit real Base USDC into a vault and execute Aave, Uniswap, Aerodrome, and Compound interactions.
+   - This layer now includes Aave and Compound withdraw round-trips in addition to one-way supply/swap smoke coverage.
+   - It validates the full path: `vault + mandate + Merkle allowlist + live protocol call`.
+
+4. User-story lifecycle tests
+   - Model the real user path: `deposit -> strategy execute -> unwind -> redeem`.
+   - Current coverage includes:
+     - Aave: `deposit -> supply -> withdraw -> redeem`
+     - Compound: `deposit -> supply -> withdraw -> redeem`
+     - Uniswap: `deposit -> USDC -> WETH -> USDC -> redeem`
+   - This layer does not stop at “protocol call succeeded”; it also checks:
+     - how many assets the user gets back
+     - whether vault shares are fully burned
+     - whether protocol positions return to zero
+
+Run protocol anchor validation:
+
+```
+BASE_RPC_URL=<your-base-mainnet-rpc> \
+forge test --match-path test/VaultForkBase.ProtocolAnchors.t.sol --fork-url "$BASE_RPC_URL" --chain-id 8453
+```
+
+Run deployed consistency validation:
+
+```
+BASE_RPC_URL=<your-base-mainnet-rpc> \
+forge test --match-path test/VaultForkBase.DeployedConsistency.t.sol --fork-url "$BASE_RPC_URL" --chain-id 8453
+```
+
+Run live protocol smoke tests:
+
+```
+BASE_RPC_URL=<your-base-mainnet-rpc> \
+forge test --match-path test/VaultForkBase.Smoke.t.sol --fork-url "$BASE_RPC_URL" --chain-id 8453
+```
+
+Run user-story lifecycle tests:
+
+```
+BASE_RPC_URL=<your-base-mainnet-rpc> \
+forge test --match-path test/VaultForkBase.UserStories.t.sol --fork-url "$BASE_RPC_URL" --chain-id 8453
+```
+
+If `deployments/base-mainnet.json` still does not contain your own deployed factory and adapter records, the second command skipping is the correct outcome rather than a broken test.
+
+Additional notes:
+
+- Base uses `SwapRouter02` for Uniswap, and its `exactInputSingle` params do not include a `deadline` field. The smoke tests quote with official `QuoterV2` first and then enforce a non-zero `amountOutMinimum`.
+- Reusing the older Ethereum mainnet `ISwapRouter` interface here causes incorrect encoding and typically results in an empty router revert.
+- Aerodrome can perform a direct volatile `USDC -> WETH` single-hop swap; read the factory from `defaultFactory()` rather than hardcoding a guessed address.
+- The `block.timestamp + 1` deadline in Aerodrome smoke tests is intentionally tight for same-transaction fork execution and is not a production recommendation.
+- In the Uniswap user-story round-trip, the final USDC amount is expected to be lower than the initial deposit because the strategy pays pool fees twice. That is expected behavior, not a vault accounting bug.
 
 ---
 
@@ -429,7 +502,7 @@ actions[1] = Action(AAVE_POOL, 0, supply(USDC, amount, vault, 0))
    - selRoot = hashPair(selLeaf0, selLeaf1)
 2. Build Extension array:
    Extension({
-     id: bytes4(keccak256("erc-xxxx:selector-allowlist@v1")),
+     id: bytes4(keccak256("erc-8192:selector-allowlist@v1")),
      required: false,
      data: abi.encode(selRoot, selectorProofs)
    })

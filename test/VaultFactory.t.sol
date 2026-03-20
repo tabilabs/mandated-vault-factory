@@ -8,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {VaultFactory} from "../src/VaultFactory.sol";
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
 import {IVaultFactory} from "../src/interfaces/IVaultFactory.sol";
-import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../src/interfaces/IERC8192MandatedVault.sol";
 import {MockAdapter, DrainAdapter, MockERC1271Authority, RejectingERC1271Authority} from "../src/mocks/MockAdapter.sol";
 import {AdapterLib} from "../src/libs/AdapterLib.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -64,9 +64,9 @@ contract VaultFactoryTest is Test {
     function _defaultMandate(MandatedVaultClone vault, uint256 nonce)
         internal
         view
-        returns (IERCXXXXMandatedVault.Mandate memory)
+        returns (IERC8192MandatedVault.Mandate memory)
     {
-        return IERCXXXXMandatedVault.Mandate({
+        return IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: nonce,
             deadline: 0,
@@ -79,9 +79,9 @@ contract VaultFactoryTest is Test {
         });
     }
 
-    function _defaultActions() internal view returns (IERCXXXXMandatedVault.Action[] memory) {
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action({
+    function _defaultActions() internal view returns (IERC8192MandatedVault.Action[] memory) {
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
             adapter: address(adapter), value: 0, data: abi.encodeCall(MockAdapter.doNothing, ())
         });
         return actions;
@@ -93,7 +93,7 @@ contract VaultFactoryTest is Test {
         return proofs;
     }
 
-    function _signMandate(MandatedVaultClone vault, IERCXXXXMandatedVault.Mandate memory mandate)
+    function _signMandate(MandatedVaultClone vault, IERC8192MandatedVault.Mandate memory mandate)
         internal
         view
         returns (bytes memory)
@@ -104,8 +104,8 @@ contract VaultFactoryTest is Test {
     }
 
     function _executeDefault(MandatedVaultClone vault, uint256 nonce) internal returns (uint256 pre, uint256 post) {
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, nonce);
-        IERCXXXXMandatedVault.Action[] memory actions = _defaultActions();
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, nonce);
+        IERC8192MandatedVault.Action[] memory actions = _defaultActions();
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
@@ -146,7 +146,7 @@ contract VaultFactoryTest is Test {
 
     function test_createVault_revert_zeroAuthority() public {
         vm.prank(creator);
-        vm.expectRevert(IERCXXXXMandatedVault.ZeroAddressAuthority.selector);
+        vm.expectRevert(IERC8192MandatedVault.ZeroAddressAuthority.selector);
         factory.createVault(address(token), "V", "V", address(0), bytes32(0));
     }
 
@@ -255,7 +255,7 @@ contract VaultFactoryTest is Test {
         MandatedVaultClone vault = _createVault();
 
         vm.prank(address(0xBAD));
-        vm.expectRevert(IERCXXXXMandatedVault.NotAuthority.selector);
+        vm.expectRevert(IERC8192MandatedVault.NotAuthority.selector);
         vault.proposeAuthority(address(0xBEEF));
     }
 
@@ -265,7 +265,7 @@ contract VaultFactoryTest is Test {
         MandatedVaultClone vault = _createVault();
         token.mint(address(vault), 1_000_000e18);
 
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         bytes32 mandateHash = vault.hashMandate(mandate);
 
         vm.prank(authority);
@@ -274,7 +274,7 @@ contract VaultFactoryTest is Test {
 
         bytes memory sig = _signMandate(vault, mandate);
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.MandateIsRevoked.selector);
+        vm.expectRevert(IERC8192MandatedVault.MandateIsRevoked.selector);
         vault.execute(mandate, _defaultActions(), sig, _defaultProofs(), "");
     }
 
@@ -286,11 +286,11 @@ contract VaultFactoryTest is Test {
         vault.invalidateNonce(0);
         assertTrue(vault.isNonceUsed(authority, 0));
 
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.NonceAlreadyUsed.selector);
+        vm.expectRevert(IERC8192MandatedVault.NonceAlreadyUsed.selector);
         vault.execute(mandate, _defaultActions(), sig, _defaultProofs(), "");
     }
 
@@ -303,11 +303,11 @@ contract VaultFactoryTest is Test {
         assertEq(vault.nonceThreshold(authority), 10);
 
         // Nonce 5 should be rejected
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 5);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 5);
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.NonceBelowThreshold.selector);
+        vm.expectRevert(IERC8192MandatedVault.NonceBelowThreshold.selector);
         vault.execute(mandate, _defaultActions(), sig, _defaultProofs(), "");
     }
 
@@ -337,7 +337,7 @@ contract VaultFactoryTest is Test {
         bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
 
         // Drain 10% (exceeds 5% max)
-        _drainExpectRevert(vault, drainer, drainerRoot, 0, 100_000e18, IERCXXXXMandatedVault.DrawdownExceeded.selector);
+        _drainExpectRevert(vault, drainer, drainerRoot, 0, 100_000e18, IERC8192MandatedVault.DrawdownExceeded.selector);
     }
 
     // =========== Cross-Vault Isolation ===========
@@ -380,7 +380,7 @@ contract VaultFactoryTest is Test {
         token.mint(v2, 1_000_000e18);
 
         // Same mandate params but different domain separator → different hash
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault1, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault1, 0);
         bytes32 hash1 = vault1.hashMandate(mandate);
         bytes32 hash2 = vault2.hashMandate(mandate);
         assertTrue(hash1 != hash2, "mandate hashes should differ across vaults");
@@ -388,7 +388,7 @@ contract VaultFactoryTest is Test {
         // Signature valid for vault1 should NOT work on vault2
         bytes memory sig = _signMandate(vault1, mandate);
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.InvalidSignature.selector);
+        vm.expectRevert(IERC8192MandatedVault.InvalidSignature.selector);
         vault2.execute(mandate, _defaultActions(), sig, _defaultProofs(), "");
     }
 
@@ -411,7 +411,7 @@ contract VaultFactoryTest is Test {
     function test_supportsInterface() public {
         MandatedVaultClone vault = _createVault();
 
-        assertTrue(vault.supportsInterface(type(IERCXXXXMandatedVault).interfaceId));
+        assertTrue(vault.supportsInterface(type(IERC8192MandatedVault).interfaceId));
     }
 
     // =========== Security Audit Fixes ===========
@@ -427,7 +427,7 @@ contract VaultFactoryTest is Test {
         vm.deal(address(vault), 1 ether);
 
         vm.prank(address(0xBAD));
-        vm.expectRevert(IERCXXXXMandatedVault.NotAuthority.selector);
+        vm.expectRevert(IERC8192MandatedVault.NotAuthority.selector);
         vault.sweepNative(payable(address(0xCAFE)), 1 ether);
     }
 
@@ -466,7 +466,7 @@ contract VaultFactoryTest is Test {
 
     function _assertVaultBusyRevert(bytes memory revertData) internal pure {
         // Outer error: ActionCallFailed selector
-        assertEq(bytes4(revertData), IERCXXXXMandatedVault.ActionCallFailed.selector);
+        assertEq(bytes4(revertData), IERC8192MandatedVault.ActionCallFailed.selector);
 
         // Decode: skip 4-byte selector, then abi.decode(uint256, bytes)
         bytes memory payload = _sliceBytes(revertData, 4);
@@ -478,7 +478,7 @@ contract VaultFactoryTest is Test {
         assembly {
             inner := mload(add(reason, 0x20))
         }
-        assertEq(inner, IERCXXXXMandatedVault.VaultBusy.selector);
+        assertEq(inner, IERC8192MandatedVault.VaultBusy.selector);
     }
 
     function _executeVaultBusyAttack(MandatedVaultClone vault, DepositAttackAdapter attacker)
@@ -487,7 +487,7 @@ contract VaultFactoryTest is Test {
     {
         bytes32 leaf = keccak256(abi.encode(address(attacker), address(attacker).codehash));
 
-        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: 0,
             deadline: 0,
@@ -499,9 +499,9 @@ contract VaultFactoryTest is Test {
             extensionsHash: keccak256("")
         });
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
         actions[0] =
-            IERCXXXXMandatedVault.Action(address(attacker), 0, abi.encodeCall(DepositAttackAdapter.tryDeposit, ()));
+            IERC8192MandatedVault.Action(address(attacker), 0, abi.encodeCall(DepositAttackAdapter.tryDeposit, ()));
 
         bytes32[][] memory proofs = new bytes32[][](1);
         proofs[0] = new bytes32[](0);
@@ -533,7 +533,7 @@ contract VaultFactoryTest is Test {
         MandatedVaultClone vault = _createVault();
         token.mint(address(vault), 1_000_000e18);
 
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         mandate.deadline = uint48(block.timestamp + 100);
 
         bytes memory sig = _signMandate(vault, mandate);
@@ -542,7 +542,7 @@ contract VaultFactoryTest is Test {
         vm.warp(block.timestamp + 101);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.MandateExpired.selector);
+        vm.expectRevert(IERC8192MandatedVault.MandateExpired.selector);
         vault.execute(mandate, _defaultActions(), sig, _defaultProofs(), "");
     }
 
@@ -553,7 +553,7 @@ contract VaultFactoryTest is Test {
         token.mint(address(vault), 1_000_000e18);
 
         // Sign mandate for epoch 0
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         bytes memory sig = _signMandate(vault, mandate);
 
         // Transfer authority (bumps epoch to 1)
@@ -565,7 +565,7 @@ contract VaultFactoryTest is Test {
 
         // Old mandate with epoch 0 should fail
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.AuthorityEpochMismatch.selector);
+        vm.expectRevert(IERC8192MandatedVault.AuthorityEpochMismatch.selector);
         vault.execute(mandate, _defaultActions(), sig, _defaultProofs(), "");
     }
 
@@ -575,16 +575,16 @@ contract VaultFactoryTest is Test {
         MandatedVaultClone vault = _createVault();
         token.mint(address(vault), 1_000_000e18);
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action({
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
             adapter: address(adapter), value: 0, data: abi.encodeCall(MockAdapter.alwaysReverts, ())
         });
 
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
-        vm.expectPartialRevert(IERCXXXXMandatedVault.ActionCallFailed.selector);
+        vm.expectPartialRevert(IERC8192MandatedVault.ActionCallFailed.selector);
         vault.execute(mandate, actions, sig, _defaultProofs(), "");
     }
 
@@ -594,16 +594,16 @@ contract VaultFactoryTest is Test {
         MandatedVaultClone vault = _createVault();
         token.mint(address(vault), 1_000_000e18);
 
-        IERCXXXXMandatedVault.Action[] memory actions = _defaultActions();
+        IERC8192MandatedVault.Action[] memory actions = _defaultActions();
 
         // Sign mandate with a WRONG payload digest
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         mandate.payloadDigest = bytes32(uint256(1)); // wrong digest
 
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.PayloadDigestMismatch.selector);
+        vm.expectRevert(IERC8192MandatedVault.PayloadDigestMismatch.selector);
         vault.execute(mandate, actions, sig, _defaultProofs(), "");
     }
 
@@ -633,7 +633,7 @@ contract VaultFactoryTest is Test {
         MandatedVaultClone vault = MandatedVaultClone(payable(v));
         token.mint(address(vault), 1_000_000e18);
 
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
@@ -650,11 +650,11 @@ contract VaultFactoryTest is Test {
         MandatedVaultClone vault = MandatedVaultClone(payable(v));
         token.mint(address(vault), 1_000_000e18);
 
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.InvalidSignature.selector);
+        vm.expectRevert(IERC8192MandatedVault.InvalidSignature.selector);
         vault.execute(mandate, _defaultActions(), sig, _defaultProofs(), "");
     }
 
@@ -669,12 +669,33 @@ contract VaultFactoryTest is Test {
         bytes32[][] memory selectorProofs = new bytes32[][](1);
         selectorProofs[0] = new bytes32[](0);
 
-        bytes4 selectorAllowlistId = bytes4(keccak256("erc-xxxx:selector-allowlist@v1"));
+        bytes4 selectorAllowlistId = bytes4(keccak256("erc-8192:selector-allowlist@v1"));
 
-        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](1);
-        exts[0] = IERCXXXXMandatedVault.Extension({
+        IERC8192MandatedVault.Extension[] memory exts = new IERC8192MandatedVault.Extension[](1);
+        exts[0] = IERC8192MandatedVault.Extension({
             id: selectorAllowlistId, required: false, data: abi.encode(selectorLeaf, selectorProofs)
         });
+        extensions = abi.encode(exts);
+        extensionsHash = keccak256(extensions);
+    }
+
+    function _buildAbsoluteLossExt(uint256 maxSingleAbsoluteLoss)
+        internal
+        pure
+        returns (bytes memory extensions, bytes32 extensionsHash)
+    {
+        bytes4 absoluteLossLimitId = bytes4(keccak256("erc-8192:absolute-loss-limit@v1"));
+        IERC8192MandatedVault.Extension[] memory exts = new IERC8192MandatedVault.Extension[](1);
+        exts[0] = IERC8192MandatedVault.Extension({
+            id: absoluteLossLimitId, required: false, data: abi.encode(maxSingleAbsoluteLoss)
+        });
+        extensions = abi.encode(exts);
+        extensionsHash = keccak256(extensions);
+    }
+
+    function _buildOptionalUnknownExt() internal pure returns (bytes memory extensions, bytes32 extensionsHash) {
+        IERC8192MandatedVault.Extension[] memory exts = new IERC8192MandatedVault.Extension[](1);
+        exts[0] = IERC8192MandatedVault.Extension({id: bytes4(0xabcdef01), required: false, data: bytes("")});
         extensions = abi.encode(exts);
         extensionsHash = keccak256(extensions);
     }
@@ -686,7 +707,7 @@ contract VaultFactoryTest is Test {
         (bytes memory extensions, bytes32 extensionsHash) =
             _buildSelectorExt(address(adapter), MockAdapter.doNothing.selector);
 
-        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: 0,
             deadline: 0,
@@ -713,7 +734,7 @@ contract VaultFactoryTest is Test {
         (bytes memory extensions, bytes32 extensionsHash) =
             _buildSelectorExt(address(adapter), MockAdapter.alwaysReverts.selector);
 
-        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: 0,
             deadline: 0,
@@ -734,9 +755,429 @@ contract VaultFactoryTest is Test {
 
     function test_supportsExtension_selectorAllowlist() public {
         MandatedVaultClone vault = _createVault();
-        bytes4 selectorAllowlistId = bytes4(keccak256("erc-xxxx:selector-allowlist@v1"));
+        bytes4 selectorAllowlistId = bytes4(keccak256("erc-8192:selector-allowlist@v1"));
         assertTrue(vault.supportsExtension(selectorAllowlistId), "should support selector allowlist");
         assertFalse(vault.supportsExtension(bytes4(0xdeadbeef)), "should not support random extension");
+    }
+
+    function test_supportsExtension_absoluteLossLimit() public {
+        MandatedVaultClone vault = _createVault();
+        bytes4 absoluteLossLimitId = bytes4(keccak256("erc-8192:absolute-loss-limit@v1"));
+        assertTrue(vault.supportsExtension(absoluteLossLimitId), "should support absolute loss limit");
+    }
+
+    function test_absoluteLossLimit_validWithinLimit() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildAbsoluteLossExt(100_000e18);
+
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 50_000e18))
+        });
+
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+        bytes memory sig = _signMandate(vault, mandate);
+
+        vm.prank(executor);
+        (uint256 pre, uint256 post) = vault.execute(mandate, actions, sig, proofs, extensions);
+        assertEq(pre, 1_000_000e18, "pre assets mismatch");
+        assertEq(post, 950_000e18, "post assets mismatch");
+    }
+
+    function test_absoluteLossLimit_revertWhenExceeded() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildAbsoluteLossExt(10_000e18);
+
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 50_000e18))
+        });
+
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+        bytes memory sig = _signMandate(vault, mandate);
+
+        vm.prank(executor);
+        vm.expectRevert(IERC8192MandatedVault.AbsoluteLossExceeded.selector);
+        vault.execute(mandate, actions, sig, proofs, extensions);
+    }
+
+    function test_absoluteLossLimit_hashBinding_tamperReverts() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (, bytes32 extensionsHash) = _buildAbsoluteLossExt(100_000e18);
+        (bytes memory tamperedExtensions,) = _buildAbsoluteLossExt(10_000e18);
+
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 50_000e18))
+        });
+
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+        bytes memory sig = _signMandate(vault, mandate);
+
+        vm.prank(executor);
+        vm.expectRevert(IERC8192MandatedVault.ExtensionsHashMismatch.selector);
+        vault.execute(mandate, actions, sig, proofs, tamperedExtensions);
+    }
+
+    function test_selectorOnlyExtension_withLoss_stillUsesBpsOnly() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) =
+            _buildSelectorExt(address(drainer), DrainAdapter.drain.selector);
+
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 10_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        (uint256 pre, uint256 post) = vault.execute(mandate, actions, sig, proofs, extensions);
+        assertEq(pre, 1_000_000e18, "pre assets mismatch");
+        assertEq(post, 990_000e18, "post assets mismatch");
+    }
+
+    function test_optionalUnknownExtension_withLoss_stillUsesBpsOnly() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildOptionalUnknownExt();
+
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 10_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        (uint256 pre, uint256 post) = vault.execute(mandate, actions, sig, proofs, extensions);
+        assertEq(pre, 1_000_000e18, "pre assets mismatch");
+        assertEq(post, 990_000e18, "post assets mismatch");
+    }
+
+    function test_absoluteLossLimit_equalThreshold_succeeds() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildAbsoluteLossExt(50_000e18);
+
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 50_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        (uint256 pre, uint256 post) = vault.execute(mandate, actions, sig, proofs, extensions);
+        assertEq(pre, 1_000_000e18, "pre assets mismatch");
+        assertEq(post, 950_000e18, "post assets mismatch");
+    }
+
+    function test_selectorAndAbsoluteCanonical_bothEnforced() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+
+        bytes4 absoluteLossLimitId = bytes4(keccak256("erc-8192:absolute-loss-limit@v1"));
+        bytes4 selectorAllowlistId = bytes4(keccak256("erc-8192:selector-allowlist@v1"));
+        assertLt(uint32(selectorAllowlistId), uint32(absoluteLossLimitId), "expected canonical id order");
+
+        bytes32 selectorLeaf = keccak256(abi.encode(address(drainer), DrainAdapter.drain.selector));
+        bytes32[][] memory selectorProofs = new bytes32[][](1);
+        selectorProofs[0] = new bytes32[](0);
+
+        IERC8192MandatedVault.Extension[] memory exts = new IERC8192MandatedVault.Extension[](2);
+        exts[0] = IERC8192MandatedVault.Extension({
+            id: selectorAllowlistId, required: false, data: abi.encode(selectorLeaf, selectorProofs)
+        });
+        exts[1] = IERC8192MandatedVault.Extension({
+            id: absoluteLossLimitId, required: false, data: abi.encode(uint256(20_000e18))
+        });
+
+        bytes memory extensions = abi.encode(exts);
+        bytes32 extensionsHash = keccak256(extensions);
+
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 5_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 10_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        (uint256 pre, uint256 post) = vault.execute(mandate, actions, sig, proofs, extensions);
+        assertEq(pre, 1_000_000e18, "pre assets mismatch");
+        assertEq(post, 990_000e18, "post assets mismatch");
+    }
+
+    function test_selectorAndAbsoluteCanonical_selectorViolationRevertsSelectorNotAllowed() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+
+        bytes4 absoluteLossLimitId = bytes4(keccak256("erc-8192:absolute-loss-limit@v1"));
+        bytes4 selectorAllowlistId = bytes4(keccak256("erc-8192:selector-allowlist@v1"));
+        assertLt(uint32(selectorAllowlistId), uint32(absoluteLossLimitId), "expected canonical id order");
+
+        bytes32 selectorLeaf = keccak256(abi.encode(address(drainer), MockAdapter.alwaysReverts.selector));
+        bytes32[][] memory selectorProofs = new bytes32[][](1);
+        selectorProofs[0] = new bytes32[](0);
+
+        IERC8192MandatedVault.Extension[] memory exts = new IERC8192MandatedVault.Extension[](2);
+        exts[0] = IERC8192MandatedVault.Extension({
+            id: selectorAllowlistId, required: false, data: abi.encode(selectorLeaf, selectorProofs)
+        });
+        exts[1] = IERC8192MandatedVault.Extension({
+            id: absoluteLossLimitId, required: false, data: abi.encode(uint256(100_000e18))
+        });
+
+        bytes memory extensions = abi.encode(exts);
+        bytes32 extensionsHash = keccak256(extensions);
+
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 10_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 10_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        vm.expectPartialRevert(AdapterLib.SelectorNotAllowed.selector);
+        vault.execute(mandate, actions, sig, proofs, extensions);
+    }
+
+    function test_selectorAndAbsoluteCanonical_absoluteViolationRevertsAbsoluteLossExceeded() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+
+        bytes4 absoluteLossLimitId = bytes4(keccak256("erc-8192:absolute-loss-limit@v1"));
+        bytes4 selectorAllowlistId = bytes4(keccak256("erc-8192:selector-allowlist@v1"));
+        assertLt(uint32(selectorAllowlistId), uint32(absoluteLossLimitId), "expected canonical id order");
+
+        bytes32 selectorLeaf = keccak256(abi.encode(address(drainer), DrainAdapter.drain.selector));
+        bytes32[][] memory selectorProofs = new bytes32[][](1);
+        selectorProofs[0] = new bytes32[](0);
+
+        IERC8192MandatedVault.Extension[] memory exts = new IERC8192MandatedVault.Extension[](2);
+        exts[0] = IERC8192MandatedVault.Extension({
+            id: selectorAllowlistId, required: false, data: abi.encode(selectorLeaf, selectorProofs)
+        });
+        exts[1] = IERC8192MandatedVault.Extension({
+            id: absoluteLossLimitId, required: false, data: abi.encode(uint256(1e18))
+        });
+
+        bytes memory extensions = abi.encode(exts);
+        bytes32 extensionsHash = keccak256(extensions);
+
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 10_000,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 10_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        vm.expectRevert(IERC8192MandatedVault.AbsoluteLossExceeded.selector);
+        vault.execute(mandate, actions, sig, proofs, extensions);
+    }
+
+    function test_drawdownAndAbsoluteBothExceeded_revertsDrawdownFirst() public {
+        MandatedVaultClone vault = _createVault();
+        token.mint(address(vault), 1_000_000e18);
+
+        DrainAdapter drainer = new DrainAdapter();
+        bytes32 drainerRoot = keccak256(abi.encode(address(drainer), address(drainer).codehash));
+        (bytes memory extensions, bytes32 extensionsHash) = _buildAbsoluteLossExt(1e18);
+
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
+            executor: executor,
+            nonce: 0,
+            deadline: 0,
+            authorityEpoch: vault.authorityEpoch(),
+            maxDrawdownBps: 500,
+            maxCumulativeDrawdownBps: 10_000,
+            allowedAdaptersRoot: drainerRoot,
+            payloadDigest: bytes32(0),
+            extensionsHash: extensionsHash
+        });
+
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(drainer),
+            value: 0,
+            data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), 60_000e18))
+        });
+        bytes32[][] memory proofs = new bytes32[][](1);
+        proofs[0] = new bytes32[](0);
+
+        bytes memory sig = _signMandate(vault, mandate);
+        vm.prank(executor);
+        vm.expectRevert(IERC8192MandatedVault.DrawdownExceeded.selector);
+        vault.execute(mandate, actions, sig, proofs, extensions);
     }
 
     // =========== Cumulative Drawdown ===========
@@ -748,7 +1189,7 @@ contract VaultFactoryTest is Test {
         uint256 nonce,
         uint256 drainAmt
     ) internal returns (uint256 pre, uint256 post) {
-        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: nonce,
             deadline: 0,
@@ -759,8 +1200,8 @@ contract VaultFactoryTest is Test {
             payloadDigest: bytes32(0),
             extensionsHash: keccak256("")
         });
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action({
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
             adapter: address(drainer),
             value: 0,
             data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), drainAmt))
@@ -781,7 +1222,7 @@ contract VaultFactoryTest is Test {
         uint256 drainAmt,
         bytes4 expectedError
     ) internal {
-        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: nonce,
             deadline: 0,
@@ -792,8 +1233,8 @@ contract VaultFactoryTest is Test {
             payloadDigest: bytes32(0),
             extensionsHash: keccak256("")
         });
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action({
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
             adapter: address(drainer),
             value: 0,
             data: abi.encodeCall(DrainAdapter.drain, (address(token), address(vault), drainAmt))
@@ -826,7 +1267,7 @@ contract VaultFactoryTest is Test {
 
         // Third execution: drain ~4% of current → cumulative 11.9% > 10% → revert
         _drainExpectRevert(
-            vault, drainer, drainerRoot, 2, 36_672e18, IERCXXXXMandatedVault.CumulativeDrawdownExceeded.selector
+            vault, drainer, drainerRoot, 2, 36_672e18, IERC8192MandatedVault.CumulativeDrawdownExceeded.selector
         );
     }
 
@@ -837,9 +1278,9 @@ contract VaultFactoryTest is Test {
         token.mint(address(vault), 1_000_000e18);
 
         // 3 actions all calling doNothing on the same adapter
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](3);
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](3);
         for (uint256 i = 0; i < 3; i++) {
-            actions[i] = IERCXXXXMandatedVault.Action({
+            actions[i] = IERC8192MandatedVault.Action({
                 adapter: address(adapter), value: 0, data: abi.encodeCall(MockAdapter.doNothing, ())
             });
         }
@@ -849,7 +1290,7 @@ contract VaultFactoryTest is Test {
             proofs[i] = new bytes32[](0);
         }
 
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
@@ -863,14 +1304,14 @@ contract VaultFactoryTest is Test {
         MandatedVaultClone vault = _createVault();
         token.mint(address(vault), 1_000_000e18);
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](0);
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](0);
         bytes32[][] memory proofs = new bytes32[][](0);
 
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.EmptyActions.selector);
+        vm.expectRevert(IERC8192MandatedVault.EmptyActions.selector);
         vault.execute(mandate, actions, sig, proofs, "");
     }
 
@@ -881,7 +1322,7 @@ contract VaultFactoryTest is Test {
         token.mint(address(vault), 1_000_000e18);
 
         // executor=0 AND payloadDigest=0 → unbounded open mandate
-        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
             executor: address(0),
             nonce: 0,
             deadline: 0,
@@ -896,7 +1337,7 @@ contract VaultFactoryTest is Test {
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.UnboundedOpenMandate.selector);
+        vm.expectRevert(IERC8192MandatedVault.UnboundedOpenMandate.selector);
         vault.execute(mandate, _defaultActions(), sig, _defaultProofs(), "");
     }
 
@@ -906,11 +1347,11 @@ contract VaultFactoryTest is Test {
         MandatedVaultClone vault = _createVault();
         token.mint(address(vault), 1_000_000e18);
 
-        IERCXXXXMandatedVault.Action[] memory actions = _defaultActions();
+        IERC8192MandatedVault.Action[] memory actions = _defaultActions();
         bytes32 actionsDigest = keccak256(abi.encode(actions));
 
         // executor=0 but payloadDigest is bound → valid open mandate
-        IERCXXXXMandatedVault.Mandate memory mandate = IERCXXXXMandatedVault.Mandate({
+        IERC8192MandatedVault.Mandate memory mandate = IERC8192MandatedVault.Mandate({
             executor: address(0),
             nonce: 0,
             deadline: 0,
@@ -940,11 +1381,11 @@ contract VaultFactoryTest is Test {
         _executeDefault(vault, 0);
 
         // Try to replay the same nonce
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         bytes memory sig = _signMandate(vault, mandate);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.NonceAlreadyUsed.selector);
+        vm.expectRevert(IERC8192MandatedVault.NonceAlreadyUsed.selector);
         vault.execute(mandate, _defaultActions(), sig, _defaultProofs(), "");
     }
 
@@ -956,10 +1397,10 @@ contract VaultFactoryTest is Test {
         vm.startPrank(authority);
         vault.invalidateNoncesBelow(10);
 
-        vm.expectRevert(IERCXXXXMandatedVault.ThresholdNotIncreased.selector);
+        vm.expectRevert(IERC8192MandatedVault.ThresholdNotIncreased.selector);
         vault.invalidateNoncesBelow(5);
 
-        vm.expectRevert(IERCXXXXMandatedVault.ThresholdNotIncreased.selector);
+        vm.expectRevert(IERC8192MandatedVault.ThresholdNotIncreased.selector);
         vault.invalidateNoncesBelow(10);
         vm.stopPrank();
     }
@@ -971,13 +1412,13 @@ contract VaultFactoryTest is Test {
         token.mint(address(vault), 1_000_000e18);
 
         // Mandate says extensionsHash = keccak256(""), but we pass non-empty extensions
-        IERCXXXXMandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
+        IERC8192MandatedVault.Mandate memory mandate = _defaultMandate(vault, 0);
         bytes memory sig = _signMandate(vault, mandate);
 
         bytes memory wrongExtensions = hex"deadbeef";
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.ExtensionsHashMismatch.selector);
+        vm.expectRevert(IERC8192MandatedVault.ExtensionsHashMismatch.selector);
         vault.execute(mandate, _defaultActions(), sig, _defaultProofs(), wrongExtensions);
     }
 }

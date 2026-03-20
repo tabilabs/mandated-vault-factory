@@ -1,9 +1,9 @@
 ---
-eip: XXXX
+eip: 8192
 title: Mandated Execution for Tokenized Vaults
 description: A minimal standard for non-custodial, risk-constrained delegated strategy execution for ERC-4626 vaults.
 author: tabilabs <lancy@tabilabs.org> (@tabilabs)
-discussions-to: https://ethereum-magicians.org/t/erc-xxxx-mandated-execution-for-tokenized-vaults-erc-4626-risk-constrained-delegated-strategy-execution/27877
+discussions-to: https://ethereum-magicians.org/t/erc-8192-mandated-execution-for-tokenized-vaults-erc-4626-risk-constrained-delegated-strategy-execution/27877
 status: Draft
 type: Standards Track
 category: ERC
@@ -232,12 +232,12 @@ Selector allowlist (optional `SelectorAllowlist@v1` extension):
 
 ## Core Interface
 
-A vault compliant with this ERC MUST implement ERC-165 and return `true` for `type(IERCXXXXMandatedVault).interfaceId`. ([Ethereum Improvement Proposals][7])
+A vault compliant with this ERC MUST implement ERC-165 and return `true` for `type(IERC8192MandatedVault).interfaceId`. ([Ethereum Improvement Proposals][7])
 
-> **interfaceId:** `0x25cb08f6` (computed as the XOR of all function selectors in `IERCXXXXMandatedVault`).
+> **interfaceId:** `0x25cb08f6` (computed as the XOR of all function selectors in `IERC8192MandatedVault`).
 
 ```solidity
-interface IERCXXXXMandatedVault /* is IERC4626, IERC165 */ {
+interface IERC8192MandatedVault /* is IERC4626, IERC165 */ {
 
     // --------- Structs ---------
     struct Action {
@@ -620,7 +620,7 @@ If `extensions.length != 0`, decoded `Extension[]` MUST be canonical:
 
 > **Canonical "no extensions" encoding:** When no extensions are used, the caller MUST pass `extensions` as an empty byte sequence (`""`, i.e., zero length). The corresponding `extensionsHash` in the mandate MUST be `keccak256("")` (= `0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470`). Note that `abi.encode(new Extension[](0))` produces a non-empty 32-byte ABI offset and differs from the empty byte sequence; implementations MUST NOT conflate the two.
 
-Extension IDs SHOULD be globally unique. A recommended convention is to derive IDs as the first 4 bytes of `keccak256` of a canonical identifier string (e.g., `"erc-xxxx:price-validation@v1"`) and publish them in a registry (out of scope for Core).
+Extension IDs SHOULD be globally unique. A recommended convention is to derive IDs as the first 4 bytes of `keccak256` of a canonical identifier string (e.g., `"erc-8192:price-validation@v1"`) and publish them in a registry (out of scope for Core).
 
 ## SelectorAllowlist@v1 (optional extension)
 
@@ -630,7 +630,7 @@ This extension allows the authority to further constrain each `Action` to an all
 
 The extension ID is:
 
-* `bytes4(keccak256("erc-xxxx:selector-allowlist@v1"))`
+* `bytes4(keccak256("erc-8192:selector-allowlist@v1"))`
 
 ### Data encoding
 
@@ -778,7 +778,7 @@ This ERC is additive. Existing ERC-4626 vaults can implement this interface with
 
 The following reference implementation is intended to be compileable (with OpenZeppelin Contracts v5.x) and to demonstrate the full Core semantics (EIP-712, ERC-1271, Merkle allowlist with codehash pinning, reentrancy safety, epoch-based cumulative drawdown tracking, authority transfer, nonce threshold invalidation). It also includes some non-Core but recommended/optional behaviors described in this document (e.g., `SelectorAllowlist@v1`, input size limits, and an authority-only native ETH escape hatch).
 
-> **Compilation note:** This reference implementation inherits from `IERCXXXXMandatedVault`, which is the interface defined in the Core Interface section above. To compile, the interface MUST be defined in a separate file (e.g., `IERCXXXXMandatedVault.sol`) and imported by the implementation contract.
+> **Compilation note:** This reference implementation inherits from `IERC8192MandatedVault`, which is the interface defined in the Core Interface section above. To compile, the interface MUST be defined in a separate file (e.g., `IERC8192MandatedVault.sol`) and imported by the implementation contract.
 
 ```solidity
 // SPDX-License-Identifier: CC0-1.0
@@ -797,13 +797,13 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 
-import {IERCXXXXMandatedVault} from "./interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "./interfaces/IERC8192MandatedVault.sol";
 
-contract MandatedVault is ERC4626, ERC165, EIP712, ReentrancyGuard, IERCXXXXMandatedVault {
+contract MandatedVault is ERC4626, ERC165, EIP712, ReentrancyGuard, IERC8192MandatedVault {
 
     bytes4 internal constant _ERC1271_MAGICVALUE = 0x1626ba7e;
     bytes32 internal constant _EMPTY_CODEHASH = keccak256("");
-    bytes4 internal constant _SELECTOR_ALLOWLIST_ID = bytes4(keccak256("erc-xxxx:selector-allowlist@v1"));
+    bytes4 internal constant _SELECTOR_ALLOWLIST_ID = bytes4(keccak256("erc-8192:selector-allowlist@v1"));
     bytes32 internal constant _MANDATE_TYPEHASH =
         keccak256(
             "Mandate(address executor,uint256 nonce,uint48 deadline,uint64 authorityEpoch,uint16 maxDrawdownBps,uint16 maxCumulativeDrawdownBps,bytes32 allowedAdaptersRoot,bytes32 payloadDigest,bytes32 extensionsHash)"
@@ -889,7 +889,7 @@ contract MandatedVault is ERC4626, ERC165, EIP712, ReentrancyGuard, IERCXXXXMand
     }
 
     function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
-        return interfaceId == type(IERCXXXXMandatedVault).interfaceId
+        return interfaceId == type(IERC8192MandatedVault).interfaceId
             || interfaceId == type(IERC4626).interfaceId
             || super.supportsInterface(interfaceId);
     }

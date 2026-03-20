@@ -1,6 +1,6 @@
 # Mandated Vault Factory
 
-ERC-1167 Clone factory for deploying **ERC-XXXX Mandated Execution** vaults — risk-constrained delegated strategy execution on ERC-4626 vaults.
+ERC-1167 Clone factory for deploying **ERC-8192 Mandated Execution** vaults — risk-constrained delegated strategy execution on ERC-4626 vaults.
 
 ## Architecture
 
@@ -43,7 +43,7 @@ VaultFactory (immutable, ownerless)
 - Action failure return data is capped at 4 KiB to prevent gas griefing via oversized `returndata`
 - `execute()` value forwarding is disabled (`action.value` must be 0) to prevent ETH drain attacks
 - Maximum 32 actions, 16 extensions, 64-deep Merkle proofs per execution
-- Library-level errors (`MandateLib.TooManyActions`, `AdapterLib.SelectorNotAllowed`, etc.) are part of `MandatedVaultClone`'s ABI and should be decoded alongside `IERCXXXXMandatedVault` errors
+- Library-level errors (`MandateLib.TooManyActions`, `AdapterLib.SelectorNotAllowed`, etc.) are part of `MandatedVaultClone`'s ABI and should be decoded alongside `IERC8192MandatedVault` errors
 
 ## Quick Start
 
@@ -129,7 +129,7 @@ The repository includes minimal deployment artifacts for BSC Testnet:
   - requires local `forge`, `cast`, and `jq`
 - Deployment record template:
   - `deployments/bsc-testnet.json`
-  - includes adapter `codehash` and Merkle `leaf` values for allowlist construction
+  - includes factory + adapter `codehash` and Merkle `leaf` values for allowlist construction
 
 Set required environment variables:
 
@@ -167,6 +167,13 @@ export DEPLOYER_DERIVATION_PATH="m/44'/60'/0'/0/0"
 Run deployment:
 
 ```bash
+export DEPLOY_BROADCAST=1
+bash scripts/deploy-bsc-testnet.sh
+```
+
+Safe preflight only:
+
+```bash
 bash scripts/deploy-bsc-testnet.sh
 ```
 
@@ -184,8 +191,118 @@ Adapter notes:
 
 - `PancakeSwapV3Adapter.swap(...)` uses router `exactInputSingle` with a `deadline` field.
 - Use a short deadline window (e.g. `block.timestamp + 60`) to avoid stale execution.
+- `scripts/deploy-bsc-testnet.sh` defaults to preflight-only and requires `DEPLOY_BROADCAST=1` for real broadcast.
 - `scripts/deploy-bsc-testnet.sh` validates router compatibility via `factory()` and `WETH9()` static calls before broadcasting.
 - `scripts/deploy-bsc-testnet.sh` writes `deployments/bsc-testnet.json` atomically (tmp + `mv`) and validates JSON before replace.
+
+## BSC Mainnet Deployment
+
+The repository now contains the live `BSC mainnet` deployment record for the active `ERC-8192` line.
+
+Current deployed contracts:
+
+- `VaultFactory`: `0x6eFC613Ece5D95e4a7b69B4EddD332CeeCbb61c6`
+- `VenusAdapter`: `0xB81966a4E1348D29102a6D76f714Bb3bf17C507e`
+- `PancakeSwapV3Adapter`: `0xDEb8deAB9E7F9068DE84A20E75A2A5165a4F2f75`
+
+Deployment transactions:
+
+- `VaultFactory`: `0x52ae84aeefbc9be6500640647b32416a362cabb2417ebca549f05e7a54647a0c`
+- `VenusAdapter`: `0xdbe0604d2a2937b33319e9f356a9f126c21b4d2a3ce7c1975c7cef9e51ed1cae`
+- `PancakeSwapV3Adapter`: `0xf1475dea00e5808625ad542c680262ebbe388cb816322efb22f1887bf0c002b2`
+
+Operational model is still intentionally split into two modes:
+
+- `preflight`: default, read-only, safe for operator validation
+- `broadcast`: explicit opt-in via `DEPLOY_BROADCAST=1`
+
+Files:
+
+- Shell wrapper:
+  - `scripts/deploy-bsc-mainnet.sh`
+- Readiness gate:
+  - `scripts/check-bsc-mainnet-readiness.sh`
+- Deployment record:
+  - `deployments/bsc-mainnet.json`
+- Fork helpers:
+  - `test/helpers/BscMainnetDeploymentJson.sol`
+  - `test/helpers/BscMainnetForkConstants.sol`
+- Fork validation suites:
+  - `test/VaultForkBscMainnet.ProtocolAnchors.t.sol`
+  - `test/VaultForkBscMainnet.DeployedConsistency.t.sol`
+- Operator guide:
+  - `docs/bsc-mainnet-deployment-runbook.md`
+
+Required environment:
+
+```bash
+export BSC_MAINNET_RPC="https://bsc-dataseed.binance.org/"
+```
+
+Recommended signer setup for future mainnet broadcasts:
+
+```bash
+export DEPLOY_SIGNER_MODE="account"
+export DEPLOYER_ACCOUNT="bsc-mainnet-deployer"
+export DEPLOYER_PASSWORD_FILE="$HOME/.secrets/foundry-keystore.pass"
+export BSCSCAN_API_KEY="..."
+```
+
+Safe preflight only:
+
+```bash
+bash scripts/deploy-bsc-mainnet.sh
+```
+
+The preflight step checks:
+
+- RPC resolves to `chainId=56`
+- Pancake router `factory()` matches the expected V3 factory
+- Pancake router `WETH9()` matches the expected `WBNB`
+- signer / verifier / deployment file / target addresses are printed before any broadcast path is allowed
+
+Future broadcast shape:
+
+```bash
+export DEPLOY_BROADCAST=1
+bash scripts/deploy-bsc-mainnet.sh
+```
+
+Mainnet fork validation:
+
+```bash
+export BSC_MAINNET_RPC="https://bsc-dataseed.binance.org/"
+
+forge test --match-path test/VaultForkBscMainnet.ProtocolAnchors.t.sol \
+  --fork-url "$BSC_MAINNET_RPC"
+
+forge test --match-path test/VaultForkBscMainnet.DeployedConsistency.t.sol \
+  --fork-url "$BSC_MAINNET_RPC"
+```
+
+Single-command readiness gate:
+
+```bash
+export BSC_MAINNET_RPC="https://bsc-dataseed.binance.org/"
+bash scripts/check-bsc-mainnet-readiness.sh
+```
+
+Notes:
+
+- `scripts/deploy-bsc-mainnet.sh` does not broadcast unless `DEPLOY_BROADCAST=1` is set.
+- `scripts/check-bsc-mainnet-readiness.sh` forces `DEPLOY_BROADCAST=0` and never enters a broadcast path.
+- `deployments/bsc-mainnet.json` now contains the real deployed factory / adapter addresses, codehashes, and leaves from `2026-03-12`.
+- The current factory implementation is `0x64b40cB0C5F63EfC15f4fDC9A7f272BA82414cca`.
+- If artifact writing fails after a successful broadcast, recover from broadcast logs and on-chain codehashes; do not guess values by hand.
+- Read the operator checklist in `docs/bsc-mainnet-deployment-runbook.md` before any real mainnet deployment.
+
+Strict post-deploy gate:
+
+```bash
+export BSC_MAINNET_RPC="https://bsc-dataseed.binance.org/"
+export REQUIRE_COMPLETE_DEPLOYMENT_RECORD=1
+bash scripts/check-bsc-mainnet-readiness.sh
+```
 
 Fork test suites are split by intent:
 

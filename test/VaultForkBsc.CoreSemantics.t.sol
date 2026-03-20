@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {VaultFactory} from "../src/VaultFactory.sol";
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
-import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../src/interfaces/IERC8192MandatedVault.sol";
 
 import {BSC_CHAIN_ID, BSC_BUSD} from "./helpers/BscForkConstants.sol";
 import {MerkleHelper} from "./helpers/MerkleHelper.sol";
@@ -67,7 +67,9 @@ contract VaultForkBscCoreSemanticsTest is Test {
         noopAdapter = new CoreNoopAdapter();
     }
 
-    function test_bscFork_us01_factoryDeterministicPredict_withCreator_matchesCreate_andDifferentCreatorDiffers() public {
+    function test_bscFork_us01_factoryDeterministicPredict_withCreator_matchesCreate_andDifferentCreatorDiffers()
+        public
+    {
         bytes32 salt = keccak256("US01_SALT");
         address creatorA = address(0xCA01);
         address creatorB = address(0xCA02);
@@ -75,10 +77,8 @@ contract VaultForkBscCoreSemanticsTest is Test {
         string memory name = "Core Sem Vault";
         string memory symbol = "csv";
 
-        address predictedA =
-            factory.predictVaultAddress(creatorA, BSC_BUSD, name, symbol, authority, salt);
-        address predictedB =
-            factory.predictVaultAddress(creatorB, BSC_BUSD, name, symbol, authority, salt);
+        address predictedA = factory.predictVaultAddress(creatorA, BSC_BUSD, name, symbol, authority, salt);
+        address predictedB = factory.predictVaultAddress(creatorB, BSC_BUSD, name, symbol, authority, salt);
 
         assertTrue(predictedA != predictedB, "different creators should have different predictions");
 
@@ -98,29 +98,26 @@ contract VaultForkBscCoreSemanticsTest is Test {
         (bytes32 root, bytes32[] memory proofNoop, bytes32[] memory proofBusy) =
             MerkleHelper.buildTree2(_leaf(address(noopAdapter)), _leaf(address(busyAdapter)));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
-        actions[1] = IERCXXXXMandatedVault.Action(
-            address(busyAdapter),
-            0,
-            abi.encodeCall(CoreVaultBusyAdapter.reenterDeposit, (1, address(busyAdapter)))
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        actions[1] = IERC8192MandatedVault.Action(
+            address(busyAdapter), 0, abi.encodeCall(CoreVaultBusyAdapter.reenterDeposit, (1, address(busyAdapter)))
         );
 
         bytes32[][] memory proofs = new bytes32[][](2);
         proofs[0] = proofNoop;
         proofs[1] = proofBusy;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
+        IERC8192MandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
         bytes memory sig = _sign(vault, m, authorityKey);
 
         (bool ok, bytes memory ret) = _execRaw(vault, m, actions, sig, proofs, executor);
         assertTrue(!ok, "expected revert");
-        assertEq(_revertSelector(ret), IERCXXXXMandatedVault.ActionCallFailed.selector, "expected ActionCallFailed");
+        assertEq(_revertSelector(ret), IERC8192MandatedVault.ActionCallFailed.selector, "expected ActionCallFailed");
 
         (uint256 index, bytes memory reason) = _decodeActionCallFailed(ret);
         assertEq(index, 1, "expected failing action index=1");
-        assertEq(_revertSelector(reason), IERCXXXXMandatedVault.VaultBusy.selector, "inner reason should be VaultBusy");
+        assertEq(_revertSelector(reason), IERC8192MandatedVault.VaultBusy.selector, "inner reason should be VaultBusy");
     }
 
     function test_bscFork_us02b_vaultBusy_reenterWithdraw_wrappedAsActionCallFailed_index1() public {
@@ -130,10 +127,9 @@ contract VaultForkBscCoreSemanticsTest is Test {
         (bytes32 root, bytes32[] memory proofNoop, bytes32[] memory proofBusy) =
             MerkleHelper.buildTree2(_leaf(address(noopAdapter)), _leaf(address(busyAdapter)));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
-        actions[1] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        actions[1] = IERC8192MandatedVault.Action(
             address(busyAdapter),
             0,
             abi.encodeCall(CoreVaultBusyAdapter.reenterWithdraw, (1, address(busyAdapter), address(busyAdapter)))
@@ -143,16 +139,16 @@ contract VaultForkBscCoreSemanticsTest is Test {
         proofs[0] = proofNoop;
         proofs[1] = proofBusy;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
+        IERC8192MandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
         bytes memory sig = _sign(vault, m, authorityKey);
 
         (bool ok, bytes memory ret) = _execRaw(vault, m, actions, sig, proofs, executor);
         assertTrue(!ok, "expected revert");
-        assertEq(_revertSelector(ret), IERCXXXXMandatedVault.ActionCallFailed.selector, "expected ActionCallFailed");
+        assertEq(_revertSelector(ret), IERC8192MandatedVault.ActionCallFailed.selector, "expected ActionCallFailed");
 
         (uint256 index, bytes memory reason) = _decodeActionCallFailed(ret);
         assertEq(index, 1, "expected failing action index=1");
-        assertEq(_revertSelector(reason), IERCXXXXMandatedVault.VaultBusy.selector, "inner reason should be VaultBusy");
+        assertEq(_revertSelector(reason), IERC8192MandatedVault.VaultBusy.selector, "inner reason should be VaultBusy");
     }
 
     function test_bscFork_us03a_unauthorizedExecutor_revertsDirect() public {
@@ -160,13 +156,12 @@ contract VaultForkBscCoreSemanticsTest is Test {
 
         bytes32 root = _leaf(address(noopAdapter));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
+        IERC8192MandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
         bytes memory sig = _sign(vault, m, authorityKey);
 
         address unauthorizedCaller = address(0xBAD);
@@ -174,8 +169,8 @@ contract VaultForkBscCoreSemanticsTest is Test {
 
         assertTrue(!ok, "expected revert");
         bytes4 sel = _revertSelector(ret);
-        assertEq(sel, IERCXXXXMandatedVault.UnauthorizedExecutor.selector, "unexpected selector");
-        assertTrue(sel != IERCXXXXMandatedVault.ActionCallFailed.selector, "must be direct vault revert");
+        assertEq(sel, IERC8192MandatedVault.UnauthorizedExecutor.selector, "unexpected selector");
+        assertTrue(sel != IERC8192MandatedVault.ActionCallFailed.selector, "must be direct vault revert");
     }
 
     function test_bscFork_us03b_invalidSignature_revertsDirect() public {
@@ -183,21 +178,20 @@ contract VaultForkBscCoreSemanticsTest is Test {
 
         bytes32 root = _leaf(address(noopAdapter));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
+        IERC8192MandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
         bytes memory wrongSig = _sign(vault, m, 0xB0B);
 
         (bool ok, bytes memory ret) = _execRaw(vault, m, actions, wrongSig, proofs, executor);
 
         assertTrue(!ok, "expected revert");
         bytes4 sel = _revertSelector(ret);
-        assertEq(sel, IERCXXXXMandatedVault.InvalidSignature.selector, "unexpected selector");
-        assertTrue(sel != IERCXXXXMandatedVault.ActionCallFailed.selector, "must be direct vault revert");
+        assertEq(sel, IERC8192MandatedVault.InvalidSignature.selector, "unexpected selector");
+        assertTrue(sel != IERC8192MandatedVault.ActionCallFailed.selector, "must be direct vault revert");
     }
 
     function test_bscFork_us03c_payloadDigestMismatch_revertsDirect() public {
@@ -205,23 +199,22 @@ contract VaultForkBscCoreSemanticsTest is Test {
 
         bytes32 root = _leaf(address(noopAdapter));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(address(noopAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
-        // payloadDigest 必须绑定 actionsDigest。这里故意给错误摘要，触发 PayloadDigestMismatch。
+        // payloadDigest must bind to actionsDigest. Intentionally provide a wrong digest to trigger PayloadDigestMismatch.
         bytes32 wrongPayloadDigest = keccak256("US03C_WRONG_PAYLOAD_DIGEST");
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, wrongPayloadDigest);
+        IERC8192MandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, wrongPayloadDigest);
         bytes memory sig = _sign(vault, m, authorityKey);
 
         (bool ok, bytes memory ret) = _execRaw(vault, m, actions, sig, proofs, executor);
 
         assertTrue(!ok, "expected revert");
         bytes4 sel = _revertSelector(ret);
-        assertEq(sel, IERCXXXXMandatedVault.PayloadDigestMismatch.selector, "unexpected selector");
-        assertTrue(sel != IERCXXXXMandatedVault.ActionCallFailed.selector, "must be direct vault revert");
+        assertEq(sel, IERC8192MandatedVault.PayloadDigestMismatch.selector, "unexpected selector");
+        assertTrue(sel != IERC8192MandatedVault.ActionCallFailed.selector, "must be direct vault revert");
     }
 
     function test_bscFork_us04_allowlist_adapterNotAllowed_eoaOrEmptyAccount() public {
@@ -229,16 +222,16 @@ contract VaultForkBscCoreSemanticsTest is Test {
 
         address eoa = address(0x12345);
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action({adapter: eoa, value: 0, data: hex"12345678"});
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({adapter: eoa, value: 0, data: hex"12345678"});
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(
+        IERC8192MandatedVault.Mandate memory m = _mandate(
             vault,
             executor,
             _nextNonce(),
-            bytes32(uint256(1)), // 非零 root，避免触发 InvalidAdaptersRoot
+            bytes32(uint256(1)), // Non-zero root to avoid triggering InvalidAdaptersRoot.
             bytes32(0)
         );
         bytes memory sig = _sign(vault, m, authorityKey);
@@ -246,7 +239,7 @@ contract VaultForkBscCoreSemanticsTest is Test {
         (bool ok, bytes memory ret) = _execRaw(vault, m, actions, sig, proofs, executor);
 
         assertTrue(!ok, "expected revert");
-        assertEq(_revertSelector(ret), IERCXXXXMandatedVault.AdapterNotAllowed.selector, "unexpected selector");
+        assertEq(_revertSelector(ret), IERC8192MandatedVault.AdapterNotAllowed.selector, "unexpected selector");
     }
 
     function test_bscFork_us04_allowlist_adapterNotAllowed_leafMismatch() public {
@@ -255,21 +248,20 @@ contract VaultForkBscCoreSemanticsTest is Test {
         CoreNoopAdapter actualAdapter = new CoreNoopAdapter();
         CoreNoopAdapter allowedAdapter = new CoreNoopAdapter();
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] =
-            IERCXXXXMandatedVault.Action(address(actualAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(address(actualAdapter), 0, abi.encodeCall(CoreNoopAdapter.nop, ()));
 
         bytes32[][] memory proofs = _singleEmptyProof();
 
-        // root 只允许 allowedAdapter，action 用 actualAdapter，leaf/proof 必然不匹配
+        // The root only allows allowedAdapter while the action uses actualAdapter, so the leaf/proof must mismatch.
         bytes32 root = _leaf(address(allowedAdapter));
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
+        IERC8192MandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
         bytes memory sig = _sign(vault, m, authorityKey);
 
         (bool ok, bytes memory ret) = _execRaw(vault, m, actions, sig, proofs, executor);
 
         assertTrue(!ok, "expected revert");
-        assertEq(_revertSelector(ret), IERCXXXXMandatedVault.AdapterNotAllowed.selector, "unexpected selector");
+        assertEq(_revertSelector(ret), IERC8192MandatedVault.AdapterNotAllowed.selector, "unexpected selector");
     }
 
     function test_bscFork_us04_allowlist_nonZeroActionValue() public {
@@ -279,27 +271,25 @@ contract VaultForkBscCoreSemanticsTest is Test {
         CoreNoopAdapter adapterB = new CoreNoopAdapter();
         CoreNoopAdapter adapterC = new CoreNoopAdapter();
 
-        // 复用 buildTree3，构造三叶 allowlist
+        // Reuse buildTree3 to construct a three-leaf allowlist.
         (bytes32 root, bytes32[][] memory proofs3) =
             MerkleHelper.buildTree3(_leaf(address(adapterA)), _leaf(address(adapterB)), _leaf(address(adapterC)));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action({
-            adapter: address(adapterA),
-            value: 1,
-            data: abi.encodeCall(CoreNoopAdapter.nop, ())
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action({
+            adapter: address(adapterA), value: 1, data: abi.encodeCall(CoreNoopAdapter.nop, ())
         });
 
         bytes32[][] memory proofs = new bytes32[][](1);
         proofs[0] = proofs3[0];
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
+        IERC8192MandatedVault.Mandate memory m = _mandate(vault, executor, _nextNonce(), root, bytes32(0));
         bytes memory sig = _sign(vault, m, authorityKey);
 
         (bool ok, bytes memory ret) = _execRaw(vault, m, actions, sig, proofs, executor);
 
         assertTrue(!ok, "expected revert");
-        assertEq(_revertSelector(ret), IERCXXXXMandatedVault.NonZeroActionValue.selector, "unexpected selector");
+        assertEq(_revertSelector(ret), IERC8192MandatedVault.NonZeroActionValue.selector, "unexpected selector");
     }
 
     function _nextNonce() internal returns (uint256) {
@@ -317,8 +307,8 @@ contract VaultForkBscCoreSemanticsTest is Test {
         uint256 nonce,
         bytes32 adaptersRoot,
         bytes32 payloadDigest
-    ) internal view returns (IERCXXXXMandatedVault.Mandate memory) {
-        return IERCXXXXMandatedVault.Mandate({
+    ) internal view returns (IERC8192MandatedVault.Mandate memory) {
+        return IERC8192MandatedVault.Mandate({
             executor: mandateExecutor,
             nonce: nonce,
             deadline: 0,
@@ -331,7 +321,7 @@ contract VaultForkBscCoreSemanticsTest is Test {
         });
     }
 
-    function _sign(MandatedVaultClone v, IERCXXXXMandatedVault.Mandate memory m, uint256 signerKey)
+    function _sign(MandatedVaultClone v, IERC8192MandatedVault.Mandate memory m, uint256 signerKey)
         internal
         view
         returns (bytes memory)
@@ -351,8 +341,8 @@ contract VaultForkBscCoreSemanticsTest is Test {
 
     function _execRaw(
         MandatedVaultClone v,
-        IERCXXXXMandatedVault.Mandate memory m,
-        IERCXXXXMandatedVault.Action[] memory actions,
+        IERC8192MandatedVault.Mandate memory m,
+        IERC8192MandatedVault.Action[] memory actions,
         bytes memory sig,
         bytes32[][] memory proofs,
         address caller
@@ -374,7 +364,7 @@ contract VaultForkBscCoreSemanticsTest is Test {
         pure
         returns (uint256 index, bytes memory reason)
     {
-        require(_revertSelector(revertData) == IERCXXXXMandatedVault.ActionCallFailed.selector, "not ActionCallFailed");
+        require(_revertSelector(revertData) == IERC8192MandatedVault.ActionCallFailed.selector, "not ActionCallFailed");
         return abi.decode(_slice(revertData, 4), (uint256, bytes));
     }
 

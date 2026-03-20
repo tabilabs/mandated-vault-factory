@@ -7,7 +7,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 
 import {VaultFactory} from "../src/VaultFactory.sol";
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
-import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../src/interfaces/IERC8192MandatedVault.sol";
 import {AdapterLib} from "../src/libs/AdapterLib.sol";
 
 import {
@@ -91,7 +91,7 @@ contract VaultForkTest is Test {
         );
     }
 
-    function _sign(MandatedVaultClone v, IERCXXXXMandatedVault.Mandate memory m) internal view returns (bytes memory) {
+    function _sign(MandatedVaultClone v, IERC8192MandatedVault.Mandate memory m) internal view returns (bytes memory) {
         (uint8 vv, bytes32 r, bytes32 s) = vm.sign(authorityKey, v.hashMandate(m));
         return abi.encodePacked(r, s, vv);
     }
@@ -105,9 +105,9 @@ contract VaultForkTest is Test {
     function _mandate(MandatedVaultClone v, uint256 nonce, uint16 maxDrawdownBps, bytes32 adaptersRoot)
         internal
         view
-        returns (IERCXXXXMandatedVault.Mandate memory)
+        returns (IERC8192MandatedVault.Mandate memory)
     {
-        return IERCXXXXMandatedVault.Mandate({
+        return IERC8192MandatedVault.Mandate({
             executor: executor,
             nonce: nonce,
             deadline: 0,
@@ -123,8 +123,8 @@ contract VaultForkTest is Test {
     /// @dev Execute a mandate with actions and proofs.
     function _exec(
         MandatedVaultClone v,
-        IERCXXXXMandatedVault.Mandate memory m,
-        IERCXXXXMandatedVault.Action[] memory actions,
+        IERC8192MandatedVault.Mandate memory m,
+        IERC8192MandatedVault.Action[] memory actions,
         bytes32[][] memory proofs
     ) internal returns (uint256 pre, uint256 post) {
         bytes memory sig = _sign(v, m);
@@ -221,16 +221,16 @@ contract VaultForkTest is Test {
         uint256 nonce = _nextNonce();
 
         // Actions: approve + supply
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, amount)));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, amount)));
         actions[1] =
-            IERCXXXXMandatedVault.Action(AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, amount, address(v), 0)));
+            IERC8192MandatedVault.Action(AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, amount, address(v), 0)));
 
         bytes32[][] memory proofs = new bytes32[][](2);
         proofs[0] = usdcProof;
         proofs[1] = aaveProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
         bytes memory sig = _sign(v, m);
 
         // Expect MandateExecuted with correct indexed topics (mandateHash, authority, executor).
@@ -238,7 +238,7 @@ contract VaultForkTest is Test {
         // depend on execution internals and are already validated by balance assertions below.
         bytes32 expectedHash = v.hashMandate(m);
         vm.expectEmit(true, true, true, false, address(v));
-        emit IERCXXXXMandatedVault.MandateExecuted(expectedHash, authority, executor, bytes32(0), 0, 0);
+        emit IERC8192MandatedVault.MandateExecuted(expectedHash, authority, executor, bytes32(0), 0, 0);
 
         vm.prank(executor);
         v.execute(m, actions, sig, proofs, "");
@@ -257,16 +257,16 @@ contract VaultForkTest is Test {
         (bytes32 root, bytes32[] memory usdcProof, bytes32[] memory aaveProof) = _aaveMerkle();
         uint256 nonce = _nextNonce();
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, amount)));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, amount)));
         actions[1] =
-            IERCXXXXMandatedVault.Action(AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, amount, address(v), 0)));
+            IERC8192MandatedVault.Action(AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, amount, address(v), 0)));
 
         bytes32[][] memory proofs = new bytes32[][](2);
         proofs[0] = usdcProof;
         proofs[1] = aaveProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
         m.payloadDigest = v.hashActions(actions);
         bytes memory sig = _sign(v, m);
 
@@ -287,31 +287,31 @@ contract VaultForkTest is Test {
         // Step 1: Supply first (pre-position)
         {
             uint256 nonce = _nextNonce();
-            IERCXXXXMandatedVault.Action[] memory supplyActions = new IERCXXXXMandatedVault.Action[](2);
+            IERC8192MandatedVault.Action[] memory supplyActions = new IERC8192MandatedVault.Action[](2);
             supplyActions[0] =
-                IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, amount)));
-            supplyActions[1] = IERCXXXXMandatedVault.Action(
+                IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, amount)));
+            supplyActions[1] = IERC8192MandatedVault.Action(
                 AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, amount, address(v), 0))
             );
             bytes32[][] memory proofs = new bytes32[][](2);
             proofs[0] = usdcProof;
             proofs[1] = aaveProof;
 
-            IERCXXXXMandatedVault.Mandate memory m1 = _mandate(v, nonce, 10000, root);
+            IERC8192MandatedVault.Mandate memory m1 = _mandate(v, nonce, 10000, root);
             _exec(v, m1, supplyActions, proofs);
         }
 
         // Step 2: Withdraw — preAssets is now 0, so no drawdown issue
         {
             uint256 nonce = _nextNonce();
-            IERCXXXXMandatedVault.Action[] memory wdActions = new IERCXXXXMandatedVault.Action[](1);
-            wdActions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory wdActions = new IERC8192MandatedVault.Action[](1);
+            wdActions[0] = IERC8192MandatedVault.Action(
                 AAVE_POOL, 0, abi.encodeCall(IAavePool.withdraw, (USDC, type(uint256).max, address(v)))
             );
             bytes32[][] memory proofs = new bytes32[][](1);
             proofs[0] = aaveProof;
 
-            IERCXXXXMandatedVault.Mandate memory m2 = _mandate(v, nonce, 0, root);
+            IERC8192MandatedVault.Mandate memory m2 = _mandate(v, nonce, 0, root);
             _exec(v, m2, wdActions, proofs);
         }
 
@@ -329,11 +329,11 @@ contract VaultForkTest is Test {
         uint256 nonce = _nextNonce();
 
         // Supply + withdraw in single execution
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](3);
-        actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, amount)));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](3);
+        actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, amount)));
         actions[1] =
-            IERCXXXXMandatedVault.Action(AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, amount, address(v), 0)));
-        actions[2] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action(AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, amount, address(v), 0)));
+        actions[2] = IERC8192MandatedVault.Action(
             AAVE_POOL, 0, abi.encodeCall(IAavePool.withdraw, (USDC, type(uint256).max, address(v)))
         );
 
@@ -343,7 +343,7 @@ contract VaultForkTest is Test {
         proofs[2] = aaveProof;
 
         // maxDrawdownBps=50 (~0.5%) — same block, no interest, rounding only
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 50, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 50, root);
         (uint256 pre, uint256 post) = _exec(v, m, actions, proofs);
 
         assertApproxEqAbs(post, pre, 2, "round-trip should preserve assets (within rounding)");
@@ -359,9 +359,9 @@ contract VaultForkTest is Test {
 
         // Supply 60% of USDC
         uint256 supplyAmt = (amount * 60) / 100;
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, supplyAmt)));
-        actions[1] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, supplyAmt)));
+        actions[1] = IERC8192MandatedVault.Action(
             AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, supplyAmt, address(v), 0))
         );
 
@@ -370,11 +370,11 @@ contract VaultForkTest is Test {
         proofs[1] = aaveProof;
 
         // maxDrawdownBps=5000 (50%) but we supply 60% → should revert
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 5000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 5000, root);
         bytes memory sig = _sign(v, m);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.DrawdownExceeded.selector);
+        vm.expectRevert(IERC8192MandatedVault.DrawdownExceeded.selector);
         v.execute(m, actions, sig, proofs, "");
     }
 
@@ -409,16 +409,16 @@ contract VaultForkTest is Test {
             sqrtPriceLimitX96: 0
         });
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (UNISWAP_ROUTER, amount)));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (UNISWAP_ROUTER, amount)));
         actions[1] =
-            IERCXXXXMandatedVault.Action(UNISWAP_ROUTER, 0, abi.encodeCall(ISwapRouter.exactInputSingle, (swapParams)));
+            IERC8192MandatedVault.Action(UNISWAP_ROUTER, 0, abi.encodeCall(ISwapRouter.exactInputSingle, (swapParams)));
 
         bytes32[][] memory proofs = new bytes32[][](2);
         proofs[0] = usdcProof;
         proofs[1] = routerProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
         _exec(v, m, actions, proofs);
 
         assertEq(IERC20(USDC).balanceOf(address(v)), 0, "USDC should be swapped out");
@@ -447,8 +447,8 @@ contract VaultForkTest is Test {
         selectorProofs[1] = selProof1;
 
         bytes memory selData = abi.encode(selRoot, selectorProofs);
-        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](1);
-        exts[0] = IERCXXXXMandatedVault.Extension(bytes4(keccak256("erc-xxxx:selector-allowlist@v1")), false, selData);
+        IERC8192MandatedVault.Extension[] memory exts = new IERC8192MandatedVault.Extension[](1);
+        exts[0] = IERC8192MandatedVault.Extension(bytes4(keccak256("erc-8192:selector-allowlist@v1")), false, selData);
         bytes memory extensions = abi.encode(exts);
 
         ISwapRouter.ExactInputSingleParams memory swapParams = ISwapRouter.ExactInputSingleParams({
@@ -462,16 +462,16 @@ contract VaultForkTest is Test {
             sqrtPriceLimitX96: 0
         });
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (UNISWAP_ROUTER, amount)));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (UNISWAP_ROUTER, amount)));
         actions[1] =
-            IERCXXXXMandatedVault.Action(UNISWAP_ROUTER, 0, abi.encodeCall(ISwapRouter.exactInputSingle, (swapParams)));
+            IERC8192MandatedVault.Action(UNISWAP_ROUTER, 0, abi.encodeCall(ISwapRouter.exactInputSingle, (swapParams)));
 
         bytes32[][] memory proofs = new bytes32[][](2);
         proofs[0] = usdcProof;
         proofs[1] = routerProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
         m.extensionsHash = keccak256(extensions);
         bytes memory sig = _sign(v, m);
 
@@ -502,20 +502,20 @@ contract VaultForkTest is Test {
             sqrtPriceLimitX96: 0
         });
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (UNISWAP_ROUTER, amount)));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (UNISWAP_ROUTER, amount)));
         actions[1] =
-            IERCXXXXMandatedVault.Action(UNISWAP_ROUTER, 0, abi.encodeCall(ISwapRouter.exactInputSingle, (swapParams)));
+            IERC8192MandatedVault.Action(UNISWAP_ROUTER, 0, abi.encodeCall(ISwapRouter.exactInputSingle, (swapParams)));
 
         bytes32[][] memory proofs = new bytes32[][](2);
         proofs[0] = usdcProof;
         proofs[1] = routerProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
         bytes memory sig = _sign(v, m);
 
         vm.prank(executor);
-        vm.expectPartialRevert(IERCXXXXMandatedVault.ActionCallFailed.selector);
+        vm.expectPartialRevert(IERC8192MandatedVault.ActionCallFailed.selector);
         v.execute(m, actions, sig, proofs, "");
     }
 
@@ -539,15 +539,15 @@ contract VaultForkTest is Test {
         (bytes32 root, bytes32[] memory usdcProof, bytes32[] memory cometProof) = _compoundMerkle();
         uint256 nonce = _nextNonce();
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (COMPOUND_COMET, amount)));
-        actions[1] = IERCXXXXMandatedVault.Action(COMPOUND_COMET, 0, abi.encodeCall(IComet.supply, (USDC, amount)));
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (COMPOUND_COMET, amount)));
+        actions[1] = IERC8192MandatedVault.Action(COMPOUND_COMET, 0, abi.encodeCall(IComet.supply, (USDC, amount)));
 
         bytes32[][] memory proofs = new bytes32[][](2);
         proofs[0] = usdcProof;
         proofs[1] = cometProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
         _exec(v, m, actions, proofs);
 
         assertEq(IERC20(USDC).balanceOf(address(v)), 0, "vault USDC should be 0");
@@ -564,14 +564,14 @@ contract VaultForkTest is Test {
         // Step 1: Supply
         {
             uint256 nonce = _nextNonce();
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-            actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (COMPOUND_COMET, amount)));
-            actions[1] = IERCXXXXMandatedVault.Action(COMPOUND_COMET, 0, abi.encodeCall(IComet.supply, (USDC, amount)));
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+            actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (COMPOUND_COMET, amount)));
+            actions[1] = IERC8192MandatedVault.Action(COMPOUND_COMET, 0, abi.encodeCall(IComet.supply, (USDC, amount)));
             bytes32[][] memory proofs = new bytes32[][](2);
             proofs[0] = usdcProof;
             proofs[1] = cometProof;
 
-            IERCXXXXMandatedVault.Mandate memory m1 = _mandate(v, nonce, 10000, root);
+            IERC8192MandatedVault.Mandate memory m1 = _mandate(v, nonce, 10000, root);
             _exec(v, m1, actions, proofs);
         }
 
@@ -584,15 +584,15 @@ contract VaultForkTest is Test {
             uint256 nonce = _nextNonce();
             uint256 cometBal = IComet(COMPOUND_COMET).balanceOf(address(v));
 
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
             actions[0] =
-                IERCXXXXMandatedVault.Action(COMPOUND_COMET, 0, abi.encodeCall(IComet.withdraw, (USDC, cometBal)));
+                IERC8192MandatedVault.Action(COMPOUND_COMET, 0, abi.encodeCall(IComet.withdraw, (USDC, cometBal)));
             bytes32[][] memory proofs = new bytes32[][](1);
             proofs[0] = cometProof;
 
             // maxDrawdownBps=0 (no single-exec loss), but maxCumulativeDrawdownBps=10000
             // to accommodate the epoch state after supply.
-            IERCXXXXMandatedVault.Mandate memory m2 = IERCXXXXMandatedVault.Mandate({
+            IERC8192MandatedVault.Mandate memory m2 = IERC8192MandatedVault.Mandate({
                 executor: executor,
                 nonce: nonce,
                 deadline: 0,
@@ -642,14 +642,14 @@ contract VaultForkTest is Test {
         });
 
         // 4 actions: approve(Aave) + supply + approve(Router) + swap
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](4);
-        actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, halfAmt)));
-        actions[1] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](4);
+        actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, halfAmt)));
+        actions[1] = IERC8192MandatedVault.Action(
             AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, halfAmt, address(v), 0))
         );
-        actions[2] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (UNISWAP_ROUTER, halfAmt)));
+        actions[2] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (UNISWAP_ROUTER, halfAmt)));
         actions[3] =
-            IERCXXXXMandatedVault.Action(UNISWAP_ROUTER, 0, abi.encodeCall(ISwapRouter.exactInputSingle, (swapParams)));
+            IERC8192MandatedVault.Action(UNISWAP_ROUTER, 0, abi.encodeCall(ISwapRouter.exactInputSingle, (swapParams)));
 
         // Proof mapping: USDC=index 0, AAVE=index 1, ROUTER=index 2
         bytes32[][] memory proofs = new bytes32[][](4);
@@ -658,7 +658,7 @@ contract VaultForkTest is Test {
         proofs[2] = treeProofs[0]; // USDC proof (reused for second approve)
         proofs[3] = treeProofs[2]; // ROUTER proof
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
         _exec(v, m, actions, proofs);
 
         assertEq(IERC20(USDC).balanceOf(address(v)), 0, "all USDC deployed");
@@ -701,21 +701,21 @@ contract VaultForkTest is Test {
         (bytes32 root, bytes32[] memory usdcProof, bytes32[] memory aaveProof) = _aaveMerkle();
         {
             uint256 nonce = _nextNonce();
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-            actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, depositAmt)));
-            actions[1] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+            actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, depositAmt)));
+            actions[1] = IERC8192MandatedVault.Action(
                 AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, depositAmt, address(v), 0))
             );
             bytes32[][] memory proofs = new bytes32[][](2);
             proofs[0] = usdcProof;
             proofs[1] = aaveProof;
 
-            IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
+            IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
             bytes memory sig = _sign(v, m);
 
             // Verify MandateExecuted event for supply mandate
             vm.expectEmit(true, true, true, false, address(v));
-            emit IERCXXXXMandatedVault.MandateExecuted(v.hashMandate(m), authority, executor, bytes32(0), 0, 0);
+            emit IERC8192MandatedVault.MandateExecuted(v.hashMandate(m), authority, executor, bytes32(0), 0, 0);
 
             vm.prank(executor);
             v.execute(m, actions, sig, proofs, "");
@@ -727,19 +727,19 @@ contract VaultForkTest is Test {
         // 7-8. Authority mandate: withdraw all from Aave
         {
             uint256 nonce = _nextNonce();
-            IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-            actions[0] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+            actions[0] = IERC8192MandatedVault.Action(
                 AAVE_POOL, 0, abi.encodeCall(IAavePool.withdraw, (USDC, type(uint256).max, address(v)))
             );
             bytes32[][] memory proofs = new bytes32[][](1);
             proofs[0] = aaveProof;
 
-            IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 0, root);
+            IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 0, root);
             bytes memory sig = _sign(v, m);
 
             // Verify MandateExecuted event for withdraw mandate
             vm.expectEmit(true, true, true, false, address(v));
-            emit IERCXXXXMandatedVault.MandateExecuted(v.hashMandate(m), authority, executor, bytes32(0), 0, 0);
+            emit IERC8192MandatedVault.MandateExecuted(v.hashMandate(m), authority, executor, bytes32(0), 0, 0);
 
             vm.prank(executor);
             v.execute(m, actions, sig, proofs, "");
@@ -766,18 +766,18 @@ contract VaultForkTest is Test {
         bytes32 root = _leaf(USDC);
 
         uint256 nonce = _nextNonce();
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](1);
-        actions[0] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](1);
+        actions[0] = IERC8192MandatedVault.Action(
             AAVE_POOL, 0, abi.encodeCall(IAavePool.supply, (USDC, 10_000e6, address(v), 0))
         );
         bytes32[][] memory proofs = new bytes32[][](1);
         proofs[0] = new bytes32[](0);
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
         bytes memory sig = _sign(v, m);
 
         vm.prank(executor);
-        vm.expectRevert(IERCXXXXMandatedVault.AdapterNotAllowed.selector);
+        vm.expectRevert(IERC8192MandatedVault.AdapterNotAllowed.selector);
         v.execute(m, actions, sig, proofs, "");
     }
 
@@ -802,14 +802,14 @@ contract VaultForkTest is Test {
         selectorProofs[1] = new bytes32[](0);
 
         bytes memory selData = abi.encode(selRoot, selectorProofs);
-        IERCXXXXMandatedVault.Extension[] memory exts = new IERCXXXXMandatedVault.Extension[](1);
-        exts[0] = IERCXXXXMandatedVault.Extension(bytes4(keccak256("erc-xxxx:selector-allowlist@v1")), false, selData);
+        IERC8192MandatedVault.Extension[] memory exts = new IERC8192MandatedVault.Extension[](1);
+        exts[0] = IERC8192MandatedVault.Extension(bytes4(keccak256("erc-8192:selector-allowlist@v1")), false, selData);
         bytes memory extensions = abi.encode(exts);
 
         // Try to call a selector that is NOT in the allowlist (withdraw instead of supply).
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, 10_000e6)));
-        actions[1] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(USDC, 0, abi.encodeCall(IERC20.approve, (AAVE_POOL, 10_000e6)));
+        actions[1] = IERC8192MandatedVault.Action(
             AAVE_POOL, 0, abi.encodeCall(IAavePool.withdraw, (USDC, 10_000e6, address(v)))
         );
 
@@ -817,7 +817,7 @@ contract VaultForkTest is Test {
         proofs[0] = usdcProof;
         proofs[1] = aaveProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, nonce, 10000, root);
         m.extensionsHash = keccak256(extensions);
         bytes memory sig = _sign(v, m);
 

@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IERCXXXXMandatedVault} from "../src/interfaces/IERCXXXXMandatedVault.sol";
+import {IERC8192MandatedVault} from "../src/interfaces/IERC8192MandatedVault.sol";
 import {PancakeSwapV3Adapter} from "../src/adapters/PancakeSwapV3Adapter.sol";
 import {MandatedVaultClone} from "../src/MandatedVaultClone.sol";
 
@@ -22,10 +22,10 @@ contract VaultForkBscPancakeTest is VaultForkBscBase {
         (bytes32 root, bytes32[] memory busdProof, bytes32[] memory adapterProof) =
             _rootForPair(BSC_BUSD, cfg.pancake.adapter);
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
         actions[0] =
-            IERCXXXXMandatedVault.Action(BSC_BUSD, 0, abi.encodeCall(IERC20.approve, (cfg.pancake.adapter, amountIn)));
-        actions[1] = IERCXXXXMandatedVault.Action(
+            IERC8192MandatedVault.Action(BSC_BUSD, 0, abi.encodeCall(IERC20.approve, (cfg.pancake.adapter, amountIn)));
+        actions[1] = IERC8192MandatedVault.Action(
             cfg.pancake.adapter,
             0,
             abi.encodeCall(
@@ -37,10 +37,10 @@ contract VaultForkBscPancakeTest is VaultForkBscBase {
         proofs[0] = busdProof;
         proofs[1] = adapterProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
         (bool ok, bytes memory ret) = _execRaw(v, m, actions, proofs);
         if (!ok) {
-            assertEq(_revertSelector(ret), IERCXXXXMandatedVault.ActionCallFailed.selector, "unexpected selector");
+            assertEq(_revertSelector(ret), IERC8192MandatedVault.ActionCallFailed.selector, "unexpected selector");
             (uint256 idx, bytes memory reason) = _decodeActionCallFailed(ret);
             assertEq(idx, 1, "unexpected failing action");
             if (_isPancakeProtocolUnavailable(reason)) {
@@ -65,11 +65,11 @@ contract VaultForkBscPancakeTest is VaultForkBscBase {
         (bytes32 root, bytes32[] memory busdProof, bytes32[] memory adapterProof) =
             _rootForPair(BSC_BUSD, address(pancakeAdapter));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(
             BSC_BUSD, 0, abi.encodeCall(IERC20.approve, (address(pancakeAdapter), amountIn))
         );
-        actions[1] = IERCXXXXMandatedVault.Action(
+        actions[1] = IERC8192MandatedVault.Action(
             address(pancakeAdapter),
             0,
             abi.encodeCall(
@@ -81,11 +81,11 @@ contract VaultForkBscPancakeTest is VaultForkBscBase {
         proofs[0] = busdProof;
         proofs[1] = adapterProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
         bytes memory sig = _sign(v, m);
 
         vm.prank(executor);
-        vm.expectPartialRevert(IERCXXXXMandatedVault.ActionCallFailed.selector);
+        vm.expectPartialRevert(IERC8192MandatedVault.ActionCallFailed.selector);
         v.execute(m, actions, sig, proofs, "");
     }
 
@@ -97,11 +97,11 @@ contract VaultForkBscPancakeTest is VaultForkBscBase {
         (bytes32 root, bytes32[] memory busdProof, bytes32[] memory adapterProof) =
             _rootForPair(BSC_BUSD, address(pancakeAdapter));
 
-        IERCXXXXMandatedVault.Action[] memory actions = new IERCXXXXMandatedVault.Action[](2);
-        actions[0] = IERCXXXXMandatedVault.Action(
+        IERC8192MandatedVault.Action[] memory actions = new IERC8192MandatedVault.Action[](2);
+        actions[0] = IERC8192MandatedVault.Action(
             BSC_BUSD, 0, abi.encodeCall(IERC20.approve, (address(pancakeAdapter), amountIn))
         );
-        actions[1] = IERCXXXXMandatedVault.Action(
+        actions[1] = IERC8192MandatedVault.Action(
             address(pancakeAdapter),
             0,
             abi.encodeCall(
@@ -114,11 +114,11 @@ contract VaultForkBscPancakeTest is VaultForkBscBase {
         proofs[0] = busdProof;
         proofs[1] = adapterProof;
 
-        IERCXXXXMandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
+        IERC8192MandatedVault.Mandate memory m = _mandate(v, _nextNonce(), 10000, root);
         bytes memory sig = _sign(v, m);
 
         vm.prank(executor);
-        vm.expectPartialRevert(IERCXXXXMandatedVault.ActionCallFailed.selector);
+        vm.expectPartialRevert(IERC8192MandatedVault.ActionCallFailed.selector);
         v.execute(m, actions, sig, proofs, "");
     }
 }
