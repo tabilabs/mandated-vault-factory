@@ -1,7 +1,7 @@
 ---
 name: predictclaw
 description: Predict.fun skill with a PolyClaw-style CLI for markets, wallet funding, trading, positions, and hedging.
-metadata: {"openclaw":{"emoji":"🔮","homepage":"https://predict.fun","primaryEnv":"PREDICT_PRIVATE_KEY","requires":{"bins":["uv"],"env":["PREDICT_ENV","PREDICT_WALLET_MODE","PREDICT_PRIVATE_KEY","PREDICT_ACCOUNT_ADDRESS","PREDICT_PRIVY_PRIVATE_KEY","PREDICT_API_KEY","ERC_MANDATED_VAULT_ADDRESS","ERC_MANDATED_FACTORY_ADDRESS","ERC_MANDATED_VAULT_ASSET_ADDRESS","ERC_MANDATED_VAULT_NAME","ERC_MANDATED_VAULT_SYMBOL","ERC_MANDATED_VAULT_AUTHORITY","ERC_MANDATED_VAULT_SALT","ERC_MANDATED_AUTHORITY_PRIVATE_KEY","ERC_MANDATED_EXECUTOR_PRIVATE_KEY","ERC_MANDATED_MCP_COMMAND","ERC_MANDATED_CONTRACT_VERSION","ERC_MANDATED_CHAIN_ID","ERC_MANDATED_ALLOWED_ADAPTERS_ROOT","ERC_MANDATED_FUNDING_MAX_AMOUNT_PER_TX","ERC_MANDATED_FUNDING_MAX_AMOUNT_PER_WINDOW","ERC_MANDATED_FUNDING_WINDOW_SECONDS","OPENROUTER_API_KEY"]},"install":[{"id":"uv-brew","kind":"brew","formula":"uv","bins":["uv"],"label":"Install uv (brew)"}]}}
+metadata: {"openclaw":{"emoji":"🔮","homepage":"https://predict.fun","requires":{"bins":["uv"],"env":["PREDICT_ENV","PREDICT_WALLET_MODE"]},"install":[{"id":"uv-brew","kind":"brew","formula":"uv","bins":["uv"],"label":"Install uv (brew)"}]}}
 ---
 
 # PredictClaw
@@ -41,6 +41,8 @@ PredictClaw only reads standard environment variables. The supported, tested inp
 If both are present, exported environment variables win and `.env` only fills missing values.
 
 If your OpenClaw host version injects environment variables into the skill process, that also works because PredictClaw receives normal env vars either way. Older docs used `skills.entries.predictclaw.env`; treat that as a host-version-specific convenience, not the canonical PredictClaw config surface.
+
+The SKILL frontmatter metadata intentionally lists only the universal entry variables: `PREDICT_ENV` and `PREDICT_WALLET_MODE`. OpenClaw's runtime metadata is flat rather than mode-aware, so listing every optional signer or vault variable there would incorrectly imply they are all required at the same time. The mode-specific requirements are documented below and enforced by the runtime config validator.
 
 ## Mode reminders
 

@@ -62,6 +62,8 @@ If both are present, exported environment variables win and `.env` only fills mi
 
 If your OpenClaw host version injects environment variables into the skill process, that also works because PredictClaw receives normal env vars either way. Older docs used `skills.entries.predictclaw.env`; treat that as a host-version-specific convenience, not the canonical PredictClaw config surface.
 
+The SKILL frontmatter metadata intentionally lists only the universal entry variables: `PREDICT_ENV` and `PREDICT_WALLET_MODE`. OpenClaw's runtime metadata is flat rather than mode-aware, so listing every optional signer or vault variable there would incorrectly imply they are all required at the same time. The mode-specific requirements are documented below and enforced by the runtime config validator.
+
 ## First-time setup (recommended)
 
 1. Install the skill and run `uv sync`.
