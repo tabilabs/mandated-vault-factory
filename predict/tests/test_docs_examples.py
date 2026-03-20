@@ -77,6 +77,18 @@ def test_documented_env_vars_match_env_example() -> None:
         assert key in skill
 
 
+def test_packaged_install_docs_inline_env_setup() -> None:
+    predict_root = get_predict_root()
+    readme = (predict_root / "README.md").read_text()
+    skill = (predict_root / "SKILL.md").read_text()
+    chinese = (predict_root / "README.zh-CN.md").read_text()
+    root_readme = (predict_root.parent / "README.md").read_text()
+    onboarding = (predict_root.parent / "docs" / "onboarding.md").read_text()
+
+    for text in [readme, skill, chinese, root_readme, onboarding]:
+        assert "template.env" in text
+
+
 def test_docs_cover_wallet_modes_and_mandated_vault_boundaries() -> None:
     predict_root = get_predict_root()
     readme = (predict_root / "README.md").read_text()

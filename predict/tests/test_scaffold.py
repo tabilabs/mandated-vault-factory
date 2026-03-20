@@ -80,6 +80,13 @@ def test_env_example_contains_required_predict_keys() -> None:
     assert missing == []
 
 
+def test_gitignore_excludes_clawhub_incompatible_artifacts() -> None:
+    predict_root = get_predict_root()
+    gitignore = (predict_root / ".gitignore").read_text()
+
+    assert "artifacts/" in gitignore
+
+
 def test_default_env_example_is_bootstrap_safe_for_first_install() -> None:
     predict_root = get_predict_root()
     env_text = (predict_root / "template.env").read_text()

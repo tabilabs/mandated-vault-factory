@@ -12,6 +12,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+artifacts/
 
 # Build artifacts
 build/

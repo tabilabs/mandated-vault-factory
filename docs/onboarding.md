@@ -64,9 +64,10 @@ uv run python scripts/predictclaw.py --help
 
 ## 7. PredictClaw Contributor Notes
 
-- The Python skill package lives in `predict/` and keeps its own `.venv`, tests, and `.env.example`.
-- For packaged installs, copy `predict/.env.example` to `~/.openclaw/skills/predictclaw/.env`; this is the recommended first-time config path.
+- The Python skill package lives in `predict/` and keeps its own `.venv`, tests, `template.env`, and a legacy `.env.example` alias.
+- For packaged installs, copy `predict/template.env` to `~/.openclaw/skills/predictclaw/.env`; this is the recommended first-time config path.
 - Use `PREDICT_ENV=test-fixture` for secret-free CLI and integration verification.
+- Live testnet market reads use `https://api-testnet.predict.fun`; mainnet market reads and trading require `PREDICT_API_KEY`.
 - `predict/SKILL.md` is OpenClaw-facing install/use documentation; `predict/README.md` is repo-local contributor documentation.
 - Do not add public CLI verbs beyond the current command contract without updating tests, docs, and `scripts/predictclaw.py --help` together.
 - PredictClaw supports four wallet modes: `read-only`, `eoa`, `predict-account`, and `mandated-vault`.

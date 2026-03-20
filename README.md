@@ -91,7 +91,7 @@ uv run pytest -q
 uv run python scripts/predictclaw.py --help
 ```
 
-For packaged OpenClaw installs, the recommended first-time setup is to copy `predict/.env.example` to `~/.openclaw/skills/predictclaw/.env` and fill the mode-specific env vars there. PredictClaw itself reads plain environment variables plus that local `.env` file.
+For packaged OpenClaw installs, the recommended first-time setup is to copy `predict/template.env` to `~/.openclaw/skills/predictclaw/.env` and fill the mode-specific env vars there. PredictClaw itself reads plain environment variables plus that local `.env` file.
 
 Use fixture mode for secret-free verification:
 
