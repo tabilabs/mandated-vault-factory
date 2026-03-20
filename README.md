@@ -84,6 +84,8 @@ forge build --sizes
 
 This repository also ships an isolated Python auxiliary tool at `predict/` for the **PredictClaw** predict.fun skill.
 
+PredictClaw's version source of truth is `predict/pyproject.toml`. The repository root is the Foundry workspace and does not define a root-level PredictClaw `pyproject.toml`, so GitHub/version checks should target the `predict/` subdirectory.
+
 ```bash
 cd predict
 uv sync
