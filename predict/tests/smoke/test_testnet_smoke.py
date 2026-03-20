@@ -26,7 +26,7 @@ def _smoke_env_or_skip() -> dict[str, str]:
         "PREDICT_ACCOUNT_ADDRESS": os.getenv("PREDICT_SMOKE_ACCOUNT_ADDRESS", ""),
         "PREDICT_PRIVY_PRIVATE_KEY": os.getenv("PREDICT_SMOKE_PRIVY_PRIVATE_KEY", ""),
         "PREDICT_API_BASE_URL": os.getenv(
-            "PREDICT_SMOKE_API_BASE_URL", "https://dev.predict.fun"
+            "PREDICT_SMOKE_API_BASE_URL", "https://api-testnet.predict.fun"
         ),
     }
 

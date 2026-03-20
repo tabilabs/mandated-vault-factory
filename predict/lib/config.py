@@ -69,7 +69,7 @@ def redact_text(text: str, secrets: list[str | None]) -> str:
 def _default_api_base_url(runtime_env: RuntimeEnv) -> str:
     if runtime_env == RuntimeEnv.MAINNET:
         return "https://api.predict.fun"
-    return "https://dev.predict.fun"
+    return "https://api-testnet.predict.fun"
 
 
 class PredictConfig(BaseModel):
@@ -109,7 +109,11 @@ class PredictConfig(BaseModel):
     @model_validator(mode="after")
     def validate_runtime_contract(self) -> "PredictConfig":
         if self.env == RuntimeEnv.MAINNET and not self.api_key:
-            raise ValueError("PREDICT_API_KEY is required for mainnet.")
+            raise ValueError(
+                "PREDICT_API_KEY is required for mainnet. "
+                "Use test-fixture for secret-free verification or "
+                "api-testnet.predict.fun for unauthenticated testnet market reads."
+            )
 
         has_eoa = self.private_key is not None
         has_predict_account_address = bool(self.predict_account_address)

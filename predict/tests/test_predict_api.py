@@ -10,7 +10,7 @@ from lib.api import PredictApiClient, PredictApiError
 from lib.config import PredictConfig
 from lib.models import AuthRequest
 
-TESTNET_API_BASE_URL = "https://dev.predict.fun"
+TESTNET_API_BASE_URL = "https://api-testnet.predict.fun"
 
 
 def make_config(**overrides: str) -> PredictConfig:

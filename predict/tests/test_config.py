@@ -46,6 +46,8 @@ def test_mainnet_requires_api_key() -> None:
         )
 
     assert "59c6995e" not in str(error.value)
+    assert "test-fixture" in str(error.value)
+    assert "api-testnet.predict.fun" in str(error.value)
 
 
 def test_testnet_eoa_configuration_uses_bnb_testnet() -> None:
@@ -59,7 +61,7 @@ def test_testnet_eoa_configuration_uses_bnb_testnet() -> None:
     assert config.wallet_mode == WalletMode.EOA
     assert config.chain_id == ChainId.BNB_TESTNET
     assert config.auth_signer_address is not None
-    assert config.api_base_url == "https://dev.predict.fun"
+    assert config.api_base_url == "https://api-testnet.predict.fun"
 
 
 def test_mainnet_defaults_to_mainnet_api_base_url() -> None:
