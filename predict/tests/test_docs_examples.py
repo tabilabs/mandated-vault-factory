@@ -112,3 +112,22 @@ def test_docs_cover_wallet_modes_and_mandated_vault_boundaries() -> None:
         assert "PREDICT_WALLET_MODE=mandated-vault" in text
         assert "PREDICT_WALLET_MODE=predict-account" in text
         assert "unsupported-in-mandated-vault-v1" in text
+
+
+def test_docs_explain_flat_metadata_vs_mode_specific_runtime_requirements() -> None:
+    predict_root = get_predict_root()
+    readme = (predict_root / "README.md").read_text()
+    skill = (predict_root / "SKILL.md").read_text()
+    readme_zh = (predict_root / "README.zh-CN.md").read_text()
+
+    for text in [readme, skill]:
+        assert "metadata intentionally lists only the universal entry variables" in text
+        assert "OpenClaw's runtime metadata is flat rather than mode-aware" in text
+        assert (
+            "mode-specific requirements are documented below and enforced by the runtime config validator"
+            in text
+        )
+
+    assert "metadata 里故意只声明通用入口变量" in readme_zh
+    assert "OpenClaw 当前的 runtime metadata 是扁平的，不是按 mode 感知的" in readme_zh
+    assert "各模式自己的必填项以下面的示例和运行时配置校验为准" in readme_zh
