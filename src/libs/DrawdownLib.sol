@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IERC8192MandatedVault} from "../interfaces/IERC8192MandatedVault.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title DrawdownLib
 /// @notice Circuit breaker logic for single-execution and cumulative drawdown checks.
@@ -14,7 +15,13 @@ library DrawdownLib {
     function checkSingleDrawdown(uint256 preAssets, uint256 postAssets, uint16 maxDrawdownBps) internal pure {
         if (preAssets != 0 && preAssets > postAssets) {
             uint256 loss = preAssets - postAssets;
-            if (loss * 10_000 > preAssets * uint256(maxDrawdownBps)) {
+            // Exact rational comparison `loss * 10_000 > preAssets * maxDrawdownBps`,
+            // evaluated overflow-safely via mulDiv + mulmod remainder (identical
+            // semantics to the plain cross-multiplication, which overflow-reverts on
+            // assets with extremely large supply and thereby DoSes the breaker).
+            uint256 lossBps = Math.mulDiv(loss, 10_000, preAssets);
+            uint256 lossBpsRemainder = mulmod(loss, 10_000, preAssets);
+            if (lossBps > uint256(maxDrawdownBps) || (lossBps == uint256(maxDrawdownBps) && lossBpsRemainder != 0)) {
                 revert IERC8192MandatedVault.DrawdownExceeded();
             }
         }
@@ -49,7 +56,14 @@ library DrawdownLib {
     {
         if (epochAssets != 0 && epochAssets > postAssets) {
             uint256 cumulativeLoss = epochAssets - postAssets;
-            if (cumulativeLoss * 10_000 > epochAssets * uint256(maxCumulativeDrawdownBps)) {
+            // See checkSingleDrawdown: exact comparison via mulDiv/mulmod,
+            // overflow-safe and identical to the plain cross-multiplication.
+            uint256 lossBps = Math.mulDiv(cumulativeLoss, 10_000, epochAssets);
+            uint256 lossBpsRemainder = mulmod(cumulativeLoss, 10_000, epochAssets);
+            if (
+                lossBps > uint256(maxCumulativeDrawdownBps)
+                    || (lossBps == uint256(maxCumulativeDrawdownBps) && lossBpsRemainder != 0)
+            ) {
                 revert IERC8192MandatedVault.CumulativeDrawdownExceeded();
             }
         }

@@ -234,7 +234,9 @@ contract MandatedVaultClone is
     // --- Epoch management ----------------------------------------------------
 
     /// @inheritdoc IERC8192MandatedVault
-    function resetEpoch() external {
+    /// @dev nonReentrant: resetEpoch makes an external call (totalAssets) and must not be
+    ///      re-entered mid-execute, where a fresh HWM would defeat the drawdown breaker.
+    function resetEpoch() external nonReentrant {
         if (msg.sender != _authority) revert NotAuthority();
         _epochAssets = totalAssets();
         _epochStart = uint48(block.timestamp);
